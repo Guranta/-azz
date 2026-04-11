@@ -121,6 +121,7 @@ export function createMockScoreTokenResponse(
       chain: "bsc",
       name: "Lobster Signal",
       symbol: "LOB",
+      marketCapUsd: 2_250_000,
       launchpad: "fourmeme",
       narrativeTags: ["meme", "community", "animal"],
       risk: {

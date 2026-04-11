@@ -505,6 +505,7 @@ function buildTokenBrief(
     chain: "bsc",
     name,
     symbol,
+    marketCapUsd: findTokenMarketCap(tokenPayload),
     launchpad: inferLaunchpad(tokenPayload, riskPayload),
     narrativeTags: extractNarrativeTags(tokenPayload),
     risk: {
@@ -515,6 +516,53 @@ function buildTokenBrief(
       riskScore,
     },
   };
+}
+
+function findTokenMarketCap(tokenPayload: unknown): number | null {
+  const direct =
+    findFirstNumber(tokenPayload, [
+      "market_cap",
+      "marketcap",
+      "mcap",
+      "fdv",
+      "fdv_usd",
+    ]) ?? null;
+  if (direct !== null) {
+    return direct;
+  }
+
+  if (!isRecord(tokenPayload)) {
+    return null;
+  }
+
+  const pairs = ensureArray(tokenPayload.pairs);
+  for (const pair of pairs) {
+    const pairMarketCap = findFirstNumber(pair, [
+      "market_cap",
+      "marketcap",
+      "mcap",
+      "fdv",
+      "fdv_usd",
+    ]);
+    if (pairMarketCap !== null) {
+      return pairMarketCap;
+    }
+  }
+
+  const nestedToken = tokenPayload.token;
+  if (nestedToken) {
+    return (
+      findFirstNumber(nestedToken, [
+        "market_cap",
+        "marketcap",
+        "mcap",
+        "fdv",
+        "fdv_usd",
+      ]) ?? null
+    );
+  }
+
+  return null;
 }
 
 function ensureArray(value: unknown): unknown[] {

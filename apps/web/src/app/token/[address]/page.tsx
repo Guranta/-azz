@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import type { ScoreTokenResponse } from "@meme-affinity/core";
+import type { AddressScore, ScoreTokenResponse } from "@meme-affinity/core";
 import { LevelBadge } from "@/components/level-badge";
 import { SiteNav } from "@/components/site-nav";
 import { TradePanel } from "@/components/trade-panel";
@@ -44,74 +44,38 @@ function getDisplayTone(level: string) {
 }
 
 function getDisplayPersonaLabel(label: string): string {
-  if (label === "CZ") return "👍 CZ";
+  if (label === "CZ") {
+    return "CZ";
+  }
+
   return label;
 }
 
-function formatRecommendation(value: string) {
-  switch (value) {
-    case "STRONG_BUY":
-      return "强烈推荐";
-    case "BUY":
-      return "推荐买入";
-    case "WATCH":
-      return "继续观察";
+function getFixedDisplayName(score: AddressScore) {
+  switch (score.id) {
+    case "wangxiaoer":
+      return "王小二";
+    case "lengjing":
+      return "冷静";
+    case "afeng":
+      return "阿峰";
     default:
-      return "先别上头";
+      return score.label;
   }
 }
 
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return `${date.toLocaleDateString("zh-CN", {
-    month: "short",
-    day: "numeric",
-  })} ${date.toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })}`;
-}
-
-function formatPercentage(value: number | null) {
-  if (value === null) {
-    return "n/a";
-  }
-
-  return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
-}
-
-function getRiskTone(riskLevel: string) {
+function getRiskBadgeTone(riskLevel: string) {
   switch (riskLevel) {
     case "LOW":
-      return {
-        badge: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-        copy: "这枚币的风险姿态相对收得住，还不算一眼劝退。",
-      };
+      return "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
     case "MEDIUM":
-      return {
-        badge: "border-amber-300/30 bg-amber-300/10 text-amber-100",
-        copy: "风险已经明显抬头，但还没到直接关页面的程度。",
-      };
+      return "border-amber-300/30 bg-amber-300/10 text-amber-100";
     case "HIGH":
-      return {
-        badge: "border-orange-400/30 bg-orange-400/10 text-orange-100",
-        copy: "这类 profile 更偏快、更偏投机，也更容易碎。",
-      };
+      return "border-orange-400/30 bg-orange-400/10 text-orange-100";
     case "CRITICAL":
-      return {
-        badge: "border-rose-400/30 bg-rose-400/10 text-rose-100",
-        copy: "这会在 live 流程里被当成明显红灯。",
-      };
+      return "border-rose-400/30 bg-rose-400/10 text-rose-100";
     default:
-      return {
-        badge: "border-white/10 bg-white/5 text-[var(--color-ink-soft)]",
-        copy: "风险元数据不完整，所以页面会保守一点解释。",
-      };
+      return "border-white/10 bg-white/5 text-[var(--color-ink-soft)]";
   }
 }
 
@@ -128,17 +92,12 @@ function getLaunchpadTone(launchpad: string) {
   }
 }
 
-function getRecommendationTone(value: string) {
-  switch (value) {
-    case "STRONG_BUY":
-      return "border-emerald-300/35 bg-emerald-300/12 text-emerald-100";
-    case "BUY":
-      return "border-amber-300/35 bg-amber-300/12 text-amber-100";
-    case "WATCH":
-      return "border-cyan-300/35 bg-cyan-300/12 text-cyan-100";
-    default:
-      return "border-white/10 bg-white/6 text-[var(--color-ink-soft)]";
+function formatPercentage(value: number | null) {
+  if (value === null) {
+    return "n/a";
   }
+
+  return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
 }
 
 async function resolveApiBaseUrl() {
@@ -182,6 +141,7 @@ async function fetchLiveScoreToken(
       payload && "error" in payload && payload.error
         ? `${payload.error}${payload.details ? `. ${payload.details}` : ""}`
         : "Live scoring failed for this token.";
+
     return {
       data: null,
       error: errorMessage,
@@ -204,9 +164,7 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
         <SiteNav current="token" ctaHref="/tech" ctaLabel="打开技术说明" />
 
         <section className="surface-card-strong poster-enter px-6 py-8 md:px-8 md:py-10">
-          <p className="section-kicker text-[var(--color-accent)]">
-            暂时拉不到 live 报告
-          </p>
+          <p className="section-kicker text-[var(--color-accent)]">暂时拿不到 live 报告</p>
           <h1 className="display-copy mt-4 text-4xl font-semibold tracking-tight text-[var(--color-ink)] md:text-5xl">
             这枚币现在还没法顺利完成评分。
           </h1>
@@ -243,15 +201,15 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
   }
 
   const token = data.token;
-  const primaryPersona = data.personaScores[0] ?? null;
-  const rankedAddressScores = [...data.addressScores].sort(
-    (left, right) => right.buyLikelihoodScore - left.buyLikelihoodScore
+  const personaScores = data.personaScores;
+  const fixedOrder = ["wangxiaoer", "lengjing", "afeng"] as const;
+  const fixedOrderedScores = fixedOrder
+    .map((id) => data.addressScores.find((score) => score.id === id))
+    .filter((item): item is AddressScore => Boolean(item));
+  const extraScores = data.addressScores.filter(
+    (score) => !fixedOrder.includes(score.id as (typeof fixedOrder)[number])
   );
-  const riskTone = getRiskTone(token.risk.riskLevel);
-  const cacheLabel = data.cache.hit ? "聪明钱包热缓存" : "聪明钱包冷请求";
-  const whaleHitCount = data.addressScores.filter(
-    (score) => score.isTop100Holder
-  ).length;
+  const displayAddressScores = [...fixedOrderedScores, ...extraScores];
 
   return (
     <main className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 py-6 md:px-10 md:py-8">
@@ -259,184 +217,169 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
 
       <section className="surface-card-strong poster-enter relative overflow-hidden px-6 py-7 md:px-8 md:py-8">
         <div className="pointer-events-none absolute -right-16 top-6 hidden h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(241,199,106,0.24)_0%,transparent_72%)] blur-3xl lg:block" />
-        <div className="relative">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full border px-3 py-1 text-xs uppercase tracking-[0.22em] ${getRecommendationTone(data.recommendation.value)}`}
-            >
-              {formatRecommendation(data.recommendation.value)}
-            </span>
-            <span
-              className={`rounded-full border px-3 py-1 text-xs uppercase tracking-[0.22em] ${riskTone.badge}`}
-            >
-              {token.risk.riskLevel} 风险
-            </span>
-            <span
-              className={`rounded-full border px-3 py-1 text-xs uppercase tracking-[0.22em] ${getLaunchpadTone(token.launchpad)}`}
-            >
-              {token.launchpad}
-            </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.22em] text-[var(--color-ink-soft)]">
-              {cacheLabel}
-            </span>
+        <div className="relative grid gap-8 xl:grid-cols-[1fr_0.95fr] xl:items-start">
+          <div>
+            <p className="section-kicker text-[var(--color-accent)]">Live V1 报告</p>
+            <h1 className="display-copy mt-4 text-4xl font-semibold tracking-tight md:text-6xl">
+              <span className="text-[var(--color-accent)]">{token.name}</span>
+            </h1>
           </div>
 
-          <div className="mt-6 grid gap-8 xl:grid-cols-[1.06fr_0.94fr] xl:items-start">
-            <div>
-              <p className="section-kicker text-[var(--color-accent)]">
-                Live V1 报告
-              </p>
-              <h1 className="display-copy mt-4 text-4xl font-semibold tracking-tight text-[var(--color-ink)] md:text-6xl">
-                {token.name}{" "}
-                <span className="text-[var(--color-accent)]">{token.symbol}</span>
-              </h1>
-              <p className="mt-4 max-w-3xl text-base leading-8 text-[var(--color-ink-soft)]">
-                {data.recommendation.summary}
-              </p>
+          <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
+            <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
+              代币快照
+            </p>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {token.narrativeTags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.18em] text-[var(--color-ink)]"
-                  >
-                    {tag}
-                  </span>
-                ))}
+            <div className="mt-4 grid gap-3 text-sm">
+              <div className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
+                <p className="text-[var(--color-muted)]">合约地址</p>
+                <p className="mt-1 break-all font-mono text-[var(--color-ink)]">{token.address}</p>
               </div>
-
-              <div className="mt-6 grid gap-3 md:grid-cols-4">
-                {[
-                  [
-                    "综合建议",
-                    formatRecommendation(data.recommendation.value),
-                    "三层信号聚合后的最终结论",
-                  ],
-                  ["人物卡", `${data.personaScores.length}`, "当前公开人物数量"],
-                  ["鲸鱼命中", `${whaleHitCount}`, "固定地址进入 top100 的数量"],
-                  [
-                    "聪明钱",
-                    `${data.smartMoney.matchedCount}`,
-                    "top100 与聪明钱包的交集",
-                  ],
-                ].map(([label, value, copy]) => (
-                  <div
-                    key={label}
-                    className="rounded-[24px] border border-white/10 bg-black/20 p-4"
-                  >
-                    <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
-                      {label}
-                    </p>
-                    <p className="mt-3 text-2xl font-semibold text-[var(--color-ink)]">
-                      {value}
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-[var(--color-ink-soft)]">
-                      {copy}
-                    </p>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
+                <span className="text-[var(--color-muted)]">代币符号</span>
+                <span className="text-[var(--color-ink)]">{token.symbol || "n/a"}</span>
               </div>
-            </div>
-
-            <div className="grid gap-5">
-              {primaryPersona ? (
-                <div className="flex flex-col items-center gap-3 rounded-[28px] border border-white/10 bg-black/20 p-6 text-center">
-                  <div className="flex items-center gap-3">
-                    <span className="text-4xl">{primaryPersona.displayEmoji}</span>
-                    <span className="text-2xl font-semibold text-[var(--color-ink)]">
-                      {getDisplayPersonaLabel(primaryPersona.label)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-3xl font-semibold text-[var(--color-accent)]">
-                      {primaryPersona.affinityScore}
-                    </span>
-                    <span className="text-sm uppercase tracking-[0.22em] text-[var(--color-muted)]">
-                      喜爱程度
-                    </span>
+              <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
+                <span className="text-[var(--color-muted)]">发射平台</span>
+                <span
+                  className={`rounded-full border px-2 py-1 text-xs uppercase tracking-[0.2em] ${getLaunchpadTone(token.launchpad)}`}
+                >
+                  {token.launchpad}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
+                <span className="text-[var(--color-muted)]">风险等级</span>
+                <span
+                  className={`rounded-full border px-2 py-1 text-xs uppercase tracking-[0.2em] ${getRiskBadgeTone(token.risk.riskLevel)}`}
+                >
+                  {token.risk.riskLevel}
+                </span>
+              </div>
+              {token.narrativeTags.length ? (
+                <div className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
+                  <p className="text-[var(--color-muted)]">叙事标签</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {token.narrativeTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs tracking-[0.18em] text-[var(--color-ink)]"
+                      >
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
               ) : null}
-
-              <div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-                <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
-                  代币快照
-                </p>
-                <div className="mt-4 grid gap-3 text-sm">
-                  <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
-                    <span className="text-[var(--color-muted)]">合约</span>
-                    <span className="font-mono text-[var(--color-ink)]">
-                      {formatAddress(token.address)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
-                    <span className="text-[var(--color-muted)]">缓存</span>
-                    <span className="text-[var(--color-ink)]">{cacheLabel}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
-                    <span className="text-[var(--color-muted)]">过期时间</span>
-                    <span className="text-[var(--color-ink)]">
-                      {formatTimestamp(data.cache.expiresAt)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
-                    <span className="text-[var(--color-muted)]">风险分</span>
-                    <span className="text-[var(--color-ink)]">
-                      {token.risk.riskScore ?? "n/a"}
-                    </span>
-                  </div>
-                  <div className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-4">
-                    <p className="font-medium text-[var(--color-ink)]">
-                      {riskTone.copy}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
+
+            <p className="mt-4 text-xs leading-6 text-[var(--color-ink-soft)]">
+              分数基于本地模型和 AI，不能保证完全正确
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[0.98fr_1.02fr]">
+      <section className="mt-6">
         <article className="surface-card reveal-up px-6 py-7 md:px-7">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="section-kicker">人物评分</p>
-              <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
-                人物喜爱程度一览
-              </h2>
-            </div>
-          </div>
+          <p className="section-kicker">赵赵爱吗</p>
+          <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
+            👍 CZ
+          </h2>
 
           <div className="mt-6 space-y-4">
-            {data.personaScores.map((persona) => (
+            {personaScores.map((persona) => (
               <div
                 key={persona.id}
-                className="flex flex-wrap items-center gap-4 rounded-[24px] border border-white/10 bg-[var(--color-panel-strong)] px-5 py-4"
+                className="rounded-[24px] border border-white/10 bg-[var(--color-panel-strong)] px-5 py-4"
               >
-                <span className="text-3xl">{persona.displayEmoji}</span>
-                <span className="text-xl font-semibold text-[var(--color-ink)]">
-                  {getDisplayPersonaLabel(persona.label)}
-                </span>
-                <LevelBadge
-                  label={formatDisplayLevel(persona.displayLevel)}
-                  emoji={persona.displayEmoji}
-                  tone={getDisplayTone(persona.displayLevel)}
-                />
-                <span className="text-2xl font-semibold text-[var(--color-accent)]">
-                  {persona.affinityScore}
-                </span>
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="text-3xl">{persona.displayEmoji}</span>
+                  <span className="text-xl font-semibold text-[var(--color-ink)]">
+                    {getDisplayPersonaLabel(persona.label)}
+                  </span>
+                  <LevelBadge
+                    label={formatDisplayLevel(persona.displayLevel)}
+                    emoji={persona.displayEmoji}
+                    tone={getDisplayTone(persona.displayLevel)}
+                  />
+                  <span className="text-2xl font-semibold text-[var(--color-accent)]">
+                    {persona.affinityScore}
+                  </span>
+                </div>
+                <p className="mt-4 text-sm leading-7 text-[var(--color-ink-soft)]">{persona.summary}</p>
+                {persona.evidence.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {persona.evidence.slice(0, 2).map((item, index) => (
+                      <span
+                        key={`${persona.id}-evidence-${index}`}
+                        className="rounded-[16px] border border-white/10 bg-black/20 px-3 py-2 text-xs leading-6 text-[var(--color-ink-soft)]"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
         </article>
+      </section>
 
+      <section className="mt-6">
+        <article className="surface-card reveal-up px-6 py-7 md:px-7">
+          <p className="section-kicker">车头爱吗</p>
+          <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
+            王小二 / 冷静 / 阿峰
+          </h2>
+
+          <div className="mt-6 space-y-4">
+            {displayAddressScores.map((score) => (
+              <div
+                key={score.id}
+                className="rounded-[26px] border border-white/10 bg-[var(--color-panel-strong)] p-5"
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-2xl">{score.displayEmoji}</span>
+                  <span className="text-xl font-semibold text-[var(--color-ink)]">
+                    {getFixedDisplayName(score)}
+                  </span>
+                  <LevelBadge
+                    label={`喜爱程度：${formatDisplayLevel(score.displayLevel)}`}
+                    emoji={score.displayEmoji}
+                    tone={getDisplayTone(score.displayLevel)}
+                  />
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-[var(--color-ink)]">
+                    分数 {score.buyLikelihoodScore}
+                  </span>
+                </div>
+
+                <div className="mt-4 rounded-[20px] border border-white/10 bg-black/20 px-4 py-3">
+                  <p className="text-sm leading-7 text-[var(--color-ink-soft)]">{score.summary}</p>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {score.evidence.map((item, evidenceIndex) => (
+                    <span
+                      key={`${score.id}-${evidenceIndex}`}
+                      className="rounded-[16px] border border-white/10 bg-white/5 px-3 py-2 text-xs leading-6 text-[var(--color-ink-soft)]"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </article>
+      </section>
+
+      <section className="mt-6">
         <article className="surface-card reveal-up px-6 py-7 md:px-7">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="section-kicker">聪明钱评分</p>
+              <p className="section-kicker">聪明钱爱吗</p>
               <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
-                聪明钱热度
+                聪明钱
               </h2>
             </div>
             <LevelBadge
@@ -461,9 +404,7 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
               </div>
 
               <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
-                  聪明钱证据
-                </p>
+                <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">evidence</p>
                 <div className="mt-4 space-y-3">
                   {data.smartMoney.evidence.map((item, index) => (
                     <div
@@ -510,135 +451,15 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
         </article>
       </section>
 
-      <section className="mt-6 grid gap-6">
-        <article className="surface-card reveal-up px-6 py-7 md:px-7">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="section-kicker">固定地址榜单</p>
-              <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
-                不是一堆卡片堆起来，而是一份按喜爱度排好的地址报告。
-              </h2>
-            </div>
-            <p className="max-w-xl text-sm leading-7 text-[var(--color-ink-soft)]">
-              主展示只保留 emoji、名字和喜爱程度；次级区域显示地址缩写、🐳、summary 和 evidence。
+      {data.errors.length ? (
+        <section className="mt-4">
+          <div className="rounded-[18px] border border-amber-300/25 bg-amber-300/8 px-4 py-3">
+            <p className="text-xs leading-6 text-amber-100/90">
+              提示：{data.errors.join("；")}
             </p>
           </div>
-
-          <div className="mt-6 space-y-4">
-            {rankedAddressScores.map((score) => (
-              <div
-                key={score.id}
-                className="rounded-[28px] border border-white/10 bg-[var(--color-panel-strong)] p-5"
-              >
-                <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <span className="text-2xl">{score.displayEmoji}</span>
-                  <span className="text-xl font-semibold text-[var(--color-ink)]">
-                    {score.label}
-                  </span>
-                  <LevelBadge
-                    label={formatDisplayLevel(score.displayLevel)}
-                    emoji={score.displayEmoji}
-                    tone={getDisplayTone(score.displayLevel)}
-                  />
-                  <span className="text-sm text-[var(--color-muted)]">
-                    {formatAddress(score.address)}
-                  </span>
-                  {score.isTop100Holder ? (
-                    <span className="text-cyan-300">
-                      {score.holderEmoji}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="rounded-[22px] border border-white/10 bg-black/20 p-4 mb-4">
-                  <p className="text-sm leading-7 text-[var(--color-ink-soft)]">
-                    {score.summary}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {score.evidence.slice(0, 2).map((item, evidenceIndex) => (
-                    <div
-                      key={`${score.id}-${evidenceIndex}`}
-                      className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-sm leading-7 text-[var(--color-ink-soft)]"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
-
-      <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <article className="surface-card reveal-up px-6 py-7 md:px-7">
-          <p className="section-kicker">结论说明</p>
-          <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
-            这页给你的，不只是分数，还有解释口径。
-          </h2>
-
-          <div className="mt-6 grid gap-4">
-            <div className="rounded-[24px] border border-white/10 bg-black/20 p-5 text-sm leading-7 text-[var(--color-ink-soft)]">
-              <p className="font-semibold text-[var(--color-ink)]">风险解释</p>
-              <p className="mt-2">{riskTone.copy}</p>
-            </div>
-            <div className="rounded-[24px] border border-white/10 bg-black/20 p-5 text-sm leading-7 text-[var(--color-ink-soft)]">
-              <p className="font-semibold text-[var(--color-ink)]">缓存说明</p>
-              <p className="mt-2">
-                当前结果属于 <span className="text-[var(--color-ink)]">{cacheLabel}</span>，
-                过期时间为 {formatTimestamp(data.cache.expiresAt)}。
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-white/10 bg-black/20 p-5 text-sm leading-7 text-[var(--color-ink-soft)]">
-              <p className="font-semibold text-[var(--color-ink)]">叙事包</p>
-              <p className="mt-2">
-                这次评分读取了代币名称、代币符号、发射台、叙事标签、风险等级、top100 持仓和聪明钱命中信息。
-              </p>
-            </div>
-          </div>
-        </article>
-
-        <article className="surface-card reveal-up px-6 py-7 md:px-7">
-          <p className="section-kicker">警告信息</p>
-          <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
-            如果上游有波动，这里会直接告诉你。
-          </h2>
-
-          {data.errors.length ? (
-            <div className="mt-6 space-y-3">
-              {data.errors.map((item, index) => (
-                <div
-                  key={`error-${index}`}
-                  className="rounded-[22px] border border-rose-300/20 bg-rose-300/8 px-4 py-4 text-sm leading-7 text-rose-50"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-6 rounded-[24px] border border-emerald-300/20 bg-emerald-300/8 px-5 py-5 text-sm leading-7 text-emerald-50">
-              这一轮没有额外警告。页面当前拿到的是完整 live 合约。
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/"
-              className="rounded-full bg-[linear-gradient(135deg,#f4c76a_0%,#ff9b62_100%)] px-5 py-3 text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_18px_40px_rgba(244,199,106,0.24)] transition hover:-translate-y-0.5"
-            >
-              再扫一枚币
-            </Link>
-            <Link
-              href="/tech"
-              className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm text-[var(--color-ink)] transition hover:border-white/18 hover:bg-white/10"
-            >
-              查看技术说明
-            </Link>
-          </div>
-        </article>
-      </section>
+        </section>
+      ) : null}
 
       <section className="mt-6">
         <TradePanel

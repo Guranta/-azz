@@ -30,6 +30,19 @@ function toWei(amount: string, decimals: number): string {
     : cleanInt + paddedFrac;
 }
 
+function formatOrderStatus(status: string) {
+  switch (status) {
+    case "confirmed":
+      return "已确认";
+    case "sent":
+      return "已发送";
+    case "error":
+      return "错误";
+    default:
+      return "已生成";
+  }
+}
+
 export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelProps) {
   const [assetsId, setAssetsId] = useState<string | null>(null);
   const [wallet, setWallet] = useState<GetWalletResponse | null>(null);
@@ -75,7 +88,9 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
         if (res.status === 404) {
           setOnboarding("no_wallet");
           setAssetsId(null);
-          try { localStorage.removeItem("ave_assets_id"); } catch {}
+          try {
+            localStorage.removeItem("ave_assets_id");
+          } catch {}
         }
         setWallet(null);
         return;
@@ -102,15 +117,17 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       const res = await fetch("/api/trade/wallet/generate", { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setError(data?.error || "Wallet creation failed");
+        setError(data?.error || "创建钱包失败");
         return;
       }
       const data = await res.json();
       const newAssetsId = data.assetsId as string;
       setAssetsId(newAssetsId);
-      try { localStorage.setItem("ave_assets_id", newAssetsId); } catch {}
+      try {
+        localStorage.setItem("ave_assets_id", newAssetsId);
+      } catch {}
     } catch {
-      setError("Network error during wallet creation");
+      setError("创建钱包时网络异常");
     } finally {
       setLoading(false);
     }
@@ -129,12 +146,12 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Approve failed");
+        setError(data.error || "授权失败");
         return;
       }
       setApproveResult(data as ApproveResponse);
     } catch {
-      setError("Network error during approve");
+      setError("授权时网络异常");
     } finally {
       setLoading(false);
     }
@@ -165,7 +182,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Swap failed");
+        setError(data.error || "下单失败");
         return;
       }
       setSwapResult(data as SwapResponse);
@@ -174,7 +191,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
         queryOrderStatus(data.orderId);
       }
     } catch {
-      setError("Network error during swap");
+      setError("交易时网络异常");
     } finally {
       setLoading(false);
     }
@@ -198,22 +215,22 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
     <div className="surface-card px-6 py-7 md:px-7">
       <p className="section-kicker">交易面板</p>
       <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
-        BSC 交易
+        实盘操作（BSC）
       </h2>
       <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
-        代币: {displayToken} ({formatAddr(tokenAddress)})
+        代币：{displayToken}（{formatAddr(tokenAddress)}）
       </p>
 
       {/* Wallet Section */}
       <div className="mt-5 rounded-[24px] border border-white/10 bg-black/20 p-5">
         <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
-          AVE 托管钱包
+          🧰 AVE 托管钱包
         </p>
 
         {onboarding === "no_wallet" && !loading && (
           <div className="mt-4">
             <p className="text-sm text-[var(--color-ink-soft)]">
-              还没有交易钱包，点击创建一个 AVE 托管钱包开始交易。
+              先创建钱包，再进行授权与买卖。钱包创建后只会在本地保存 `assetsId`。
             </p>
             <button
               onClick={handleGenerateWallet}
@@ -228,19 +245,13 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
         {onboarding === "wallet_empty" && wallet && (
           <div className="mt-4">
             <div className="flex items-center gap-3">
-              <span className="font-mono text-sm text-[var(--color-ink)]">
-                {wallet.address}
-              </span>
+              <span className="font-mono text-sm text-[var(--color-ink)]">{wallet.address}</span>
             </div>
             <div className="mt-3 rounded-[18px] border border-amber-300/20 bg-amber-300/8 px-4 py-3">
-              <p className="text-sm text-amber-50">
-                请向以下地址转入 BNB 或 USDT (BSC)
-              </p>
-              <p className="mt-2 break-all font-mono text-xs text-amber-100">
-                {wallet.address}
-              </p>
+              <p className="text-sm text-amber-50">请向这个地址转入 BNB 或 USDT（BSC）</p>
+              <p className="mt-2 break-all font-mono text-xs text-amber-100">{wallet.address}</p>
               <p className="mt-2 text-xs text-amber-50/70">
-                转入后刷新页面即可开始交易。最低建议转入 0.1 BNB 或等值 USDT。
+                到账后点击刷新余额即可继续。建议最少转入 0.1 BNB 或等值 USDT。
               </p>
             </div>
             <button
@@ -255,11 +266,9 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
         {onboarding === "wallet_funded" && wallet && (
           <div className="mt-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-mono text-sm text-[var(--color-ink)]">
-                {formatAddr(wallet.address)}
-              </span>
+              <span className="font-mono text-sm text-[var(--color-ink)]">{formatAddr(wallet.address)}</span>
               <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs text-emerald-200">
-                已充值
+                已入金
               </span>
             </div>
             {wallet.balances.length > 0 && (
@@ -290,39 +299,32 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
 
       {/* Approve Section */}
       <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
-          授权
-        </p>
+        <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">✅ 授权</p>
         <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
-          授权 AVE 合约花费该代币，卖出前需要先授权。
+          卖出前请先授权当前代币给 AVE 合约。
         </p>
         <button
           onClick={handleApprove}
           disabled={loading || onboarding !== "wallet_funded"}
-          title={onboarding !== "wallet_funded" ? "请先充值" : undefined}
+          title={onboarding !== "wallet_funded" ? "请先完成入金" : undefined}
           className="mt-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-[var(--color-ink)] transition hover:border-white/18 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {loading ? "处理中..." : "授权 (Approve)"}
+          {loading ? "处理中..." : "授权代币"}
         </button>
 
         {approveResult && (
           <div className="mt-3 rounded-[18px] border border-emerald-300/20 bg-emerald-300/8 px-4 py-3 text-sm text-emerald-50">
-            <p>已授权 {displayToken}</p>
-            <p className="mt-1 font-mono text-xs">
-              spender: {formatAddr(approveResult.spender)}
-            </p>
-            <p className="mt-1 font-mono text-xs">
-              order: {approveResult.orderId}
-            </p>
+            <p>已授权：{displayToken}</p>
+            <p className="mt-1 font-mono text-xs">spender: {formatAddr(approveResult.spender)}</p>
+            <p className="mt-1 font-mono text-xs">order: {approveResult.orderId}</p>
           </div>
         )}
       </div>
 
       {/* Swap Section */}
       <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
-        <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
-          交易
-        </p>
+        <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">↔ 买卖</p>
+        <p className="mt-2 text-sm text-[var(--color-ink-soft)]">每次操作都需要手动确认，不会自动下单。</p>
 
         <div className="mt-4 grid gap-3">
           {/* Side toggle */}
@@ -343,20 +345,23 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
           </div>
 
           {/* Base token */}
-          <div className="flex gap-2">
-            {(["bnb", "usdt"] as const).map((bt) => (
-              <button
-                key={bt}
-                onClick={() => setBaseToken(bt)}
-                className={`rounded-full border px-4 py-2 text-xs font-mono uppercase transition ${
-                  baseToken === bt
-                    ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
-                    : "border-white/10 bg-white/5 text-[var(--color-ink)] hover:border-white/18"
-                }`}
-              >
-                {bt}
-              </button>
-            ))}
+          <div>
+            <p className="mb-2 text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">计价币</p>
+            <div className="flex gap-2">
+              {(["bnb", "usdt"] as const).map((bt) => (
+                <button
+                  key={bt}
+                  onClick={() => setBaseToken(bt)}
+                  className={`rounded-full border px-4 py-2 text-xs font-mono uppercase transition ${
+                    baseToken === bt
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+                      : "border-white/10 bg-white/5 text-[var(--color-ink)] hover:border-white/18"
+                  }`}
+                >
+                  {bt}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Amount */}
@@ -398,7 +403,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
             !amount ||
             Number(amount) <= 0
           }
-          title={onboarding !== "wallet_funded" ? "请先充值" : undefined}
+          title={onboarding !== "wallet_funded" ? "请先完成入金" : undefined}
           className="mt-4 w-full rounded-full bg-[linear-gradient(135deg,#f4c76a_0%,#ff9b62_100%)] px-5 py-3 text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_18px_40px_rgba(244,199,106,0.24)] transition hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? "处理中..." : side === "buy" ? "确认买入" : "确认卖出"}
@@ -415,25 +420,19 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       {/* Swap result */}
       {swapResult && (
         <div className="mt-4 rounded-[22px] border border-white/10 bg-black/20 p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
-            订单结果
-          </p>
+          <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">订单回执</p>
           <div className="mt-3 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-[var(--color-muted)]">订单 ID</span>
-              <span className="font-mono text-[var(--color-ink)]">
-                {swapResult.orderId}
-              </span>
+              <span className="font-mono text-[var(--color-ink)]">{swapResult.orderId}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--color-muted)]">方向</span>
-              <span className="text-[var(--color-ink)]">
-                {swapResult.side === "buy" ? "买入" : "卖出"}
-              </span>
+              <span className="text-[var(--color-ink)]">{swapResult.side === "buy" ? "买入" : "卖出"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--color-muted)]">状态</span>
-              <span className="text-[var(--color-ink)]">{swapResult.status}</span>
+              <span className="text-[var(--color-ink)]">{formatOrderStatus(swapResult.status)}</span>
             </div>
           </div>
           {swapResult.orderId && (
@@ -450,9 +449,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       {/* Order status */}
       {orderStatus && orderStatus.orders.length > 0 && (
         <div className="mt-4 rounded-[22px] border border-white/10 bg-black/20 p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
-            订单状态
-          </p>
+          <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">订单状态</p>
           {orderStatus.orders.map((order) => (
             <div key={order.orderId} className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between">
@@ -466,37 +463,25 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
                         : "text-amber-200"
                   }
                 >
-                  {order.status === "confirmed"
-                    ? "已确认"
-                    : order.status === "sent"
-                      ? "已发送"
-                      : order.status === "error"
-                        ? "错误"
-                        : "已生成"}
+                  {formatOrderStatus(order.status)}
                 </span>
               </div>
               {order.txHash && (
                 <div className="flex justify-between">
                   <span className="text-[var(--color-muted)]">链上哈希</span>
-                  <span className="font-mono text-xs text-[var(--color-ink)]">
-                    {formatAddr(order.txHash)}
-                  </span>
+                  <span className="font-mono text-xs text-[var(--color-ink)]">{formatAddr(order.txHash)}</span>
                 </div>
               )}
               {order.inAmount && (
                 <div className="flex justify-between">
                   <span className="text-[var(--color-muted)]">输入量</span>
-                  <span className="font-mono text-xs text-[var(--color-ink)]">
-                    {order.inAmount}
-                  </span>
+                  <span className="font-mono text-xs text-[var(--color-ink)]">{order.inAmount}</span>
                 </div>
               )}
               {order.outAmount && (
                 <div className="flex justify-between">
                   <span className="text-[var(--color-muted)]">输出量</span>
-                  <span className="font-mono text-xs text-[var(--color-ink)]">
-                    {order.outAmount}
-                  </span>
+                  <span className="font-mono text-xs text-[var(--color-ink)]">{order.outAmount}</span>
                 </div>
               )}
               {order.errorMessage && (

@@ -4,7 +4,7 @@ import {
   buildAddressProfile,
   buildFallbackAddressProfile,
   createAveDataClient,
-  createMiniMaxScorerFromEnv,
+  createMiniMaxScorer,
   getMiniMaxFailureCode,
   getMiniMaxFailureDetail,
   isBscAddress,
@@ -30,6 +30,7 @@ const ADDRESS_CACHE_TTL_MS = 300_000;
 const DEFAULT_AVE_BASE_URL = "https://prod.ave-api.com";
 const DEFAULT_AVE_TIMEOUT_MS = 10_000;
 const INSUFFICIENT_PROFILE_TRADE_COUNT = 3;
+const MINIMAX_ADDRESS_TIMEOUT_MS = 60_000;
 
 const BASE_ASSET_SYMBOLS = new Set([
   "BNB",
@@ -687,7 +688,7 @@ function buildAddressCachePayload(input: {
 }
 
 function getMiniMaxScorerState(): {
-  scorer: ReturnType<typeof createMiniMaxScorerFromEnv> | null;
+  scorer: ReturnType<typeof createMiniMaxScorer> | null;
   errors: string[];
 } {
   const errors: string[] = [];
@@ -700,8 +701,25 @@ function getMiniMaxScorerState(): {
   }
 
   try {
+    const apiKey = process.env.MINIMAX_API_KEY?.trim() || process.env.ANTHROPIC_API_KEY?.trim() || "";
+    const baseUrl = process.env.MINIMAX_BASE_URL?.trim() || process.env.ANTHROPIC_BASE_URL?.trim();
+    const apiStyle = process.env.MINIMAX_API_STYLE?.trim().toLowerCase() === "openai"
+      ? "openai" as const
+      : "anthropic" as const;
+    const plan = process.env.MINIMAX_PLAN?.trim().toLowerCase() === "coding"
+      ? "coding" as const
+      : "token" as const;
+
     return {
-      scorer: createMiniMaxScorerFromEnv(process.env),
+      scorer: createMiniMaxScorer({
+        apiKey,
+        apiHost: process.env.MINIMAX_API_HOST,
+        baseUrl,
+        apiStyle,
+        plan,
+        model: process.env.MINIMAX_MODEL,
+        fastModeTimeoutMs: MINIMAX_ADDRESS_TIMEOUT_MS,
+      }),
       errors,
     };
   } catch (error) {
@@ -717,7 +735,7 @@ function getMiniMaxScorerState(): {
 function mergeAddressProfile(
   deterministicProfile: AddressProfile,
   refinedProfile: Awaited<
-    ReturnType<ReturnType<typeof createMiniMaxScorerFromEnv>["refineAddressProfile"]>
+    ReturnType<ReturnType<typeof createMiniMaxScorer>["refineAddressProfile"]>
   >
 ): AddressProfile {
   return {

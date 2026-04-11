@@ -1,6 +1,6 @@
 # Task Tracker
 
-Last updated: 2026-04-11
+Last updated: 2026-04-12
 
 Use this file as the single progress board when work is split across multiple AI windows.
 
@@ -37,14 +37,17 @@ Use this file as the single progress board when work is split across multiple AI
 | C8 | V2 arbitrary-address profile with MiniMax refinement | Another Codex | c8-window | done | C6 | live `/api/score-address`, `/address/[address]`, and homepage dual-mode input |
 | C9 | Local hardening before deployment | Another Codex | c9-window | done | C8 | tracked-address cache, MiniMax timeout tuning, copy cleanup, runtime consistency verified, local acceptance tests passed |
 | C10 | Re-scope address flow back to pure wallet profile | Another Codex | c10-window | done | C9 | profile-only `/api/score-address`, profile-only `/address/[address]`, homepage/tech copy aligned |
-| C12 | MiniMax fallback performance optimization | Another Codex | c12-window | done | C9 | provider-level fast-mode (8s timeout, no retries), true fast-fail for token scoring |
+| C12 | MiniMax fallback performance optimization | Another Codex | c12-window | done | C9 | provider-level fast-mode, true fast-fail for token scoring |
 | A7 | V3 BSC real-trading contract (docs only) | Another Codex | a7-window | done | C9 | V3 trading contract document |
 | C11 | V3 BSC real-trading website implementation | Another Codex | c11-window | done | A7 | AVE Bot adapter + 5 trade API routes + token page trading panel |
 | O6 | V3 skill trade instruction support | Another Codex | o6-window | done | C11 | skill approve/buy/sell + confirmation + failure semantics |
 | G1 | Deployment prep (gitignore, Dockerfile, compose, docs) | Another Codex | g1-window | done | C11 | deployment materials ready for VPS |
 | G4 | Repo cleanup and source-of-truth sync | Another Codex | g4-window | done | C12 | temp files removed, docs synced for Hermes redeploy |
-| T10 | VPS deployment | Another Codex | deploy-window | todo | C12 | deployed site + ops docs |
-| T11 | Final integration and maintenance docs | Another Codex | final-window | todo | T10 | smoke tests and runbook |
+| O7 | Production-facing copy and skill validation | Another Codex | o7-window | done | G4 | homepage/address copy aligned to Chinese, skill 4-instruction validation passed |
+| C13 | Frozen driver system switch + tech page update | Claude Code | main | done | G4 | tracked-address scoring switched to frozen driver system; tech page updated to Chinese with system notes; address page enhanced with summary+evidence |
+| D1 | Full documentation rewrite | Claude Code | main | done | C13 | ARCHITECTURE.md, RUNBOOK.md, updated PROJECT_HANDOFF.md and TASK_TRACKER.md |
+| T10 | VPS deployment | — | — | todo | D1 | deployed site + ops docs |
+| T11 | Final integration and maintenance docs | — | — | done | D1 | architecture guide, operations runbook, updated handoff |
 
 ## Current Recommended Assignment
 
@@ -122,6 +125,9 @@ Whenever a task changes state:
 - 2026-04-11: `C12` completed by another Codex. Added `fastMiniMaxCall<T>()` wrapper in `apps/web/src/lib/score-token.ts` with 8s deadline. Before: MiniMax worst case ~32s (16s timeout × 2 retries) per scoring call before fallback. After: fallback fires within 8s per call. API shape unchanged (`ScoreTokenResponse` same 7 keys). Fallback still works — deterministic rules used when MiniMax times out or fails. Build and lint green.
 - 2026-04-11: `C12` revision: replaced fake fast-fail with true provider-level fast-mode. Added `fastModeTimeoutMs` to `MiniMaxPersonaScorerOptions` in `packages/core/src/providers/minimax.ts`. When set: overrides timeout to 8s and disables retries entirely. `score-token.ts` now creates a fast-mode scorer instead of wrapping calls in a setTimeout race. Removed `fastMiniMaxCall` wrapper. Each MiniMax call site uses direct try/catch with exactly one fallback side effect. `score-address.ts` untouched (still uses 16s + retries). API shape unchanged. Build and lint green.
 - 2026-04-11: `G4` completed. Removed temp files `staged.txt` and `h -u origin main`. Docs synced: C12 revision complete, next step is Hermes redeploy (T10).
+- 2026-04-11: `O7` completed. Production-facing copy pass: homepage fixed 3 mixed-language spots ("smart wallet overlap" → Chinese, "1 active" → "1 位", "N watchers" → "N 位观察者"), address page fixed 2 English error messages → Chinese. Skill 4-instruction validation passed (analyze/approve/buy/sell all clean, confirmation prompts clear, onboarding gate clear, error templates concise). Token page and /tech page unchanged — already clean. No structural changes. Build and lint green.
+- 2026-04-12: `C13` completed. Frozen driver system switch confirmed: tracked-address scoring uses frozen driver snapshots (not live chain queries). Tech page updated: FLOW_STEPS and SCORE_CHANNELS rewritten in Chinese, new "系统说明" section covering frozen driver system, MiniMax 60s no-retry strategy, V3 trading status. Address page enhanced: added summary paragraph and evidence list while keeping minimalist large-font design. Build and lint green.
+- 2026-04-12: `D1` completed. Full documentation rewrite: created `docs/ARCHITECTURE.md` (comprehensive architecture guide covering system overview, repo structure, scoring architecture, frozen driver system, MiniMax provider, trading, API reference, data flows, configuration, design system), created `docs/RUNBOOK.md` (operations runbook covering local development, production deployment, monitoring, failure recovery, frozen driver maintenance, security notes, smoke tests, demo tokens), updated `docs/PROJECT_HANDOFF.md` (concise current-state handoff reflecting all completed work), updated `docs/TASK_TRACKER.md` (added C13 and D1 entries). Build and lint green.
 
 ## Ready For Review
 

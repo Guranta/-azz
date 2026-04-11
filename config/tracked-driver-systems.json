@@ -1,0 +1,241 @@
+[
+  {
+    "id": "wangxiaoer",
+    "address": "0x176e6378b7c9010f0456bee76ce3039d36dc37c8",
+    "sampledAt": "2026-04-10T12:13:17.000013Z",
+    "sampledTradeCount": 8,
+    "sampledBuyCount": 8,
+    "sampledTokenCount": 4,
+    "summary": "王小二 frozen driver sampled 8 meme trades and now scores future tokens against that static snapshot.",
+    "distilledPreferences": {
+      "favoriteNarratives": [
+        {
+          "value": "community",
+          "count": 4
+        },
+        {
+          "value": "exchange",
+          "count": 4
+        },
+        {
+          "value": "meme",
+          "count": 4
+        },
+        {
+          "value": "ai",
+          "count": 1
+        }
+      ],
+      "marketCapBands": [
+        {
+          "value": "mega",
+          "count": 4
+        },
+        {
+          "value": "mid",
+          "count": 2
+        },
+        {
+          "value": "micro",
+          "count": 2
+        }
+      ],
+      "nameStylePreferences": [
+        {
+          "value": "chinese",
+          "count": 8
+        },
+        {
+          "value": "short",
+          "count": 8
+        },
+        {
+          "value": "meme",
+          "count": 4
+        },
+        {
+          "value": "long",
+          "count": 3
+        },
+        {
+          "value": "ai",
+          "count": 1
+        }
+      ],
+      "launchpadBias": [
+        {
+          "value": "fourmeme",
+          "count": 5
+        },
+        {
+          "value": "unknown",
+          "count": 3
+        }
+      ],
+      "medianBuyAmountUsd": 1172.52,
+      "medianHoldMinutes": null,
+      "tradingRhythm": "low-frequency",
+      "holdingStyle": "unknown",
+      "riskAppetite": "aggressive",
+      "convictionPattern": "repeat-buyer"
+    }
+  },
+  {
+    "id": "lengjing",
+    "address": "0xeb89055e16ae1c1e42ad6770a7344ff5c7b4f31d",
+    "sampledAt": "2026-04-10T05:26:30.000009Z",
+    "sampledTradeCount": 13,
+    "sampledBuyCount": 5,
+    "sampledTokenCount": 2,
+    "summary": "冷静 frozen driver sampled 13 meme trades and now scores future tokens against that static snapshot.",
+    "distilledPreferences": {
+      "favoriteNarratives": [
+        {
+          "value": "payments",
+          "count": 4
+        },
+        {
+          "value": "global",
+          "count": 4
+        }
+      ],
+      "marketCapBands": [
+        {
+          "value": "mega",
+          "count": 4
+        },
+        {
+          "value": "mid",
+          "count": 1
+        }
+      ],
+      "nameStylePreferences": [
+        {
+          "value": "short",
+          "count": 5
+        },
+        {
+          "value": "long",
+          "count": 5
+        },
+        {
+          "value": "latin",
+          "count": 4
+        },
+        {
+          "value": "numbered",
+          "count": 4
+        },
+        {
+          "value": "chinese",
+          "count": 1
+        }
+      ],
+      "launchpadBias": [
+        {
+          "value": "unknown",
+          "count": 5
+        }
+      ],
+      "medianBuyAmountUsd": 220.26,
+      "medianHoldMinutes": 3037,
+      "tradingRhythm": "low-frequency",
+      "holdingStyle": "holder",
+      "riskAppetite": "cautious",
+      "convictionPattern": "repeat-buyer"
+    }
+  },
+  {
+    "id": "afeng",
+    "address": "0xbf004bff64725914ee36d03b87d6965b0ced4903",
+    "sampledAt": "2026-04-11T14:48:01.000004Z",
+    "sampledTradeCount": 71,
+    "sampledBuyCount": 44,
+    "sampledTokenCount": 36,
+    "summary": "阿峰 frozen driver sampled 71 meme trades and now scores future tokens against that static snapshot.",
+    "distilledPreferences": {
+      "favoriteNarratives": [
+        {
+          "value": "meme",
+          "count": 3
+        },
+        {
+          "value": "payments",
+          "count": 3
+        },
+        {
+          "value": "global",
+          "count": 3
+        },
+        {
+          "value": "community",
+          "count": 2
+        },
+        {
+          "value": "exchange",
+          "count": 2
+        },
+        {
+          "value": "animal",
+          "count": 1
+        }
+      ],
+      "marketCapBands": [
+        {
+          "value": "micro",
+          "count": 39
+        },
+        {
+          "value": "mega",
+          "count": 5
+        }
+      ],
+      "nameStylePreferences": [
+        {
+          "value": "short",
+          "count": 37
+        },
+        {
+          "value": "chinese",
+          "count": 32
+        },
+        {
+          "value": "long",
+          "count": 16
+        },
+        {
+          "value": "latin",
+          "count": 12
+        },
+        {
+          "value": "numbered",
+          "count": 9
+        },
+        {
+          "value": "meme",
+          "count": 3
+        }
+      ],
+      "launchpadBias": [
+        {
+          "value": "fourmeme",
+          "count": 36
+        },
+        {
+          "value": "unknown",
+          "count": 7
+        },
+        {
+          "value": "flap",
+          "count": 1
+        }
+      ],
+      "medianBuyAmountUsd": 389.28,
+      "medianHoldMinutes": 0,
+      "tradingRhythm": "high-frequency",
+      "holdingStyle": "sniper",
+      "riskAppetite": "aggressive",
+      "convictionPattern": "one-shot-rotator"
+    }
+  }
+]

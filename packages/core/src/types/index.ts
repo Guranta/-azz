@@ -38,6 +38,7 @@ export interface TokenBrief {
   chain: "bsc";
   name: string;
   symbol: string;
+  marketCapUsd: number | null;
   launchpad: "fourmeme" | "flap" | "unknown";
   narrativeTags: string[];
   risk: TokenRiskSummary;

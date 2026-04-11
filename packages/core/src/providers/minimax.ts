@@ -86,8 +86,8 @@ export interface MiniMaxPersonaScorerOptions {
   fetchImpl?: FetchLike;
   /**
    * When set, overrides `timeoutMs` for the internal HTTP request and
-   * disables retries. Used by the token scoring path to enforce a hard
-   * 8s ceiling per MiniMax call.
+   * disables retries. Used by token/address scoring paths when the caller
+   * wants a single-attempt ceiling instead of retryable provider behavior.
    */
   fastModeTimeoutMs?: number;
 }
@@ -104,7 +104,7 @@ export interface ScoreTrackedAddressWithMiniMaxInput {
     "id" | "label" | "address" | "logoKey" | "logoMode"
   >;
   deterministicScore: AddressScore;
-  recentTradeCount: number;
+  sampledTradeCount: number;
   top100Rank: number | null;
   top100Percentage: number | null;
   isSmartWallet: boolean;
@@ -434,17 +434,17 @@ function buildTrackedAddressPrompt(
   return [
     "Evaluate whether this fixed tracked address would buy or love the token.",
     "",
-    "The deterministic rule engine already extracted the features below.",
+    "The deterministic rule engine already extracted the features below from a frozen driver system.",
     "Use them as the primary signal, add judgment, and stay conservative.",
     "",
-    `Token: ${input.token.name} (${input.token.symbol})`,
-    `Launchpad: ${input.token.launchpad}`,
-    `Narrative tags: ${input.token.narrativeTags.join(", ") || "unknown"}`,
-    `Risk: ${input.token.risk.riskLevel} (${input.token.risk.riskScore ?? "unknown"})`,
-    "",
-    `Tracked address: ${input.trackedAddress.label} (${input.trackedAddress.address})`,
-    `Recent token-scoped trades: ${input.recentTradeCount}`,
-    `Deterministic narrativeAffinityScore: ${score.narrativeAffinityScore}`,
+      `Token: ${input.token.name} (${input.token.symbol})`,
+      `Launchpad: ${input.token.launchpad}`,
+      `Narrative tags: ${input.token.narrativeTags.join(", ") || "unknown"}`,
+      `Risk: ${input.token.risk.riskLevel} (${input.token.risk.riskScore ?? "unknown"})`,
+      "",
+      `Tracked address: ${input.trackedAddress.label} (${input.trackedAddress.address})`,
+      `Frozen sampled meme trades: ${input.sampledTradeCount}`,
+      `Deterministic narrativeAffinityScore: ${score.narrativeAffinityScore}`,
     `Deterministic buyLikelihoodScore: ${score.buyLikelihoodScore}`,
     `Deterministic displayLevel: ${score.displayLevel}`,
     `Launchpad bias: ${score.launchpadBias}`,
@@ -459,7 +459,7 @@ function buildTrackedAddressPrompt(
     "",
     "Rules:",
     "- Keep the final level aligned with the evidence.",
-    "- If recentTradeCount is 0 or evidence is thin, be conservative.",
+    "- If sampledTradeCount is 0 or evidence is thin, be conservative.",
     "- Top100 holder state and AVE smart-wallet state can raise conviction, but should not overpower weak history.",
     "- Return a final displayLevel and final scores.",
     "",
