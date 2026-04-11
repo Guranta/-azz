@@ -8,7 +8,7 @@ import {
   createAveDataClient,
   getMiniMaxFailureCode,
   getMiniMaxFailureDetail,
-  createMiniMaxScorerFromEnv,
+  createMiniMaxScorer,
   getDisplayLevelFromScore,
   isMiniMaxEnabled,
   MiniMaxApiError,
@@ -42,6 +42,7 @@ import { createMetricsRecorder } from "@/lib/runtime-metrics";
 const RECENT_HISTORY_PAGE_SIZE = 100;
 const DEFAULT_AVE_BASE_URL = "https://prod.ave-api.com";
 const DEFAULT_AVE_TIMEOUT_MS = 10_000;
+const MINIMAX_SCORING_TIMEOUT_MS = 8_000;
 
 function formatMiniMaxInternalReason(error: unknown): string {
   if (error instanceof MiniMaxConfigurationError) {
@@ -667,7 +668,7 @@ function applyTrackedAddressContext(input: {
 }
 
 function getMiniMaxScorerState(): {
-  scorer: ReturnType<typeof createMiniMaxScorerFromEnv> | null;
+  scorer: ReturnType<typeof createMiniMaxScorer> | null;
   errors: string[];
 } {
   const errors: string[] = [];
@@ -680,8 +681,25 @@ function getMiniMaxScorerState(): {
   }
 
   try {
+    const apiKey = process.env.MINIMAX_API_KEY?.trim() || process.env.ANTHROPIC_API_KEY?.trim() || "";
+    const baseUrl = process.env.MINIMAX_BASE_URL?.trim() || process.env.ANTHROPIC_BASE_URL?.trim();
+    const apiStyle = process.env.MINIMAX_API_STYLE?.trim().toLowerCase() === "openai"
+      ? "openai" as const
+      : "anthropic" as const;
+    const plan = process.env.MINIMAX_PLAN?.trim().toLowerCase() === "coding"
+      ? "coding" as const
+      : "token" as const;
+
     return {
-      scorer: createMiniMaxScorerFromEnv(process.env),
+      scorer: createMiniMaxScorer({
+        apiKey,
+        apiHost: process.env.MINIMAX_API_HOST,
+        baseUrl,
+        apiStyle,
+        plan,
+        model: process.env.MINIMAX_MODEL,
+        fastModeTimeoutMs: MINIMAX_SCORING_TIMEOUT_MS,
+      }),
       errors,
     };
   } catch (error) {
@@ -696,7 +714,7 @@ function getMiniMaxScorerState(): {
 
 async function scoreEnabledPersonas(
   token: TokenBrief,
-  minimaxScorer: ReturnType<typeof createMiniMaxScorerFromEnv> | null
+  minimaxScorer: ReturnType<typeof createMiniMaxScorer> | null
 ): Promise<{
   personaScores: PersonaScore[];
   errors: string[];
@@ -715,17 +733,15 @@ async function scoreEnabledPersonas(
         return scoreCzAffinity(token, { persona });
       }
 
+      const deterministic = scoreCzAffinity(token, { persona });
       try {
-        return await minimaxScorer.scoreCzAffinity({
-          token,
-          persona,
-        });
+        return await minimaxScorer.scoreCzAffinity({ token, persona });
       } catch (error) {
         logMiniMaxFallback(`persona ${persona.id}`, error);
         errors.push(
           `Persona scoring for ${persona.label} fell back to deterministic rules.`
         );
-        return scoreCzAffinity(token, { persona });
+        return deterministic;
       }
     })
   );
@@ -744,7 +760,7 @@ async function fetchTrackedAddressScore(input: {
   holderLookup: HolderLookup;
   smartWalletLookup: Map<string, AveSmartWallet>;
   smartMoneyMatchedCount: number;
-  minimaxScorer: ReturnType<typeof createMiniMaxScorerFromEnv> | null;
+  minimaxScorer: ReturnType<typeof createMiniMaxScorer> | null;
   aveClient: AveDataClient;
   metricsRecorder: ReturnType<typeof createMetricsRecorder>;
 }): Promise<{ score: AddressScore; error?: string }> {
@@ -809,7 +825,7 @@ async function fetchTrackedAddressScore(input: {
     }
 
     try {
-      const finalDraft = await input.minimaxScorer.scoreTrackedAddressAffinity({
+      const mmResult = await input.minimaxScorer.scoreTrackedAddressAffinity({
         token: input.token,
         trackedAddress: input.trackedAddress,
         deterministicScore,
@@ -824,12 +840,12 @@ async function fetchTrackedAddressScore(input: {
         score: attachAddressDisplay({
           score: {
             ...deterministicScore,
-            narrativeAffinityScore: finalDraft.narrativeAffinityScore,
-            buyLikelihoodScore: finalDraft.buyLikelihoodScore,
-            confidence: finalDraft.confidence,
-            summary: finalDraft.summary,
+            narrativeAffinityScore: mmResult.narrativeAffinityScore,
+            buyLikelihoodScore: mmResult.buyLikelihoodScore,
+            confidence: mmResult.confidence,
+            summary: mmResult.summary,
             evidence: Array.from(
-              new Set([...finalDraft.evidence, ...deterministicScore.evidence])
+              new Set([...mmResult.evidence, ...deterministicScore.evidence])
             ).slice(0, 6),
             styleLabels: Array.from(
               new Set([...deterministicScore.styleLabels, "minimax-final"])

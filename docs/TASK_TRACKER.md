@@ -36,12 +36,14 @@ Use this file as the single progress board when work is split across multiple AI
 | C6 | Demo token screening and local score-quality closure | Another Codex | c6-window | done | C5 | selected demo tokens, fallback diagnosis, and deploy gate decision |
 | C8 | V2 arbitrary-address profile with MiniMax refinement | Another Codex | c8-window | done | C6 | live `/api/score-address`, `/address/[address]`, and homepage dual-mode input |
 | C9 | Local hardening before deployment | Another Codex | c9-window | done | C8 | tracked-address cache, MiniMax timeout tuning, copy cleanup, runtime consistency verified, local acceptance tests passed |
-| C10 | Re-scope address flow back to pure wallet profile | Another Codex | c10-window | review | C9 | profile-only `/api/score-address`, profile-only `/address/[address]`, homepage/tech copy aligned |
+| C10 | Re-scope address flow back to pure wallet profile | Another Codex | c10-window | done | C9 | profile-only `/api/score-address`, profile-only `/address/[address]`, homepage/tech copy aligned |
+| C12 | MiniMax fallback performance optimization | Another Codex | c12-window | done | C9 | provider-level fast-mode (8s timeout, no retries), true fast-fail for token scoring |
 | A7 | V3 BSC real-trading contract (docs only) | Another Codex | a7-window | done | C9 | V3 trading contract document |
 | C11 | V3 BSC real-trading website implementation | Another Codex | c11-window | done | A7 | AVE Bot adapter + 5 trade API routes + token page trading panel |
 | O6 | V3 skill trade instruction support | Another Codex | o6-window | done | C11 | skill approve/buy/sell + confirmation + failure semantics |
 | G1 | Deployment prep (gitignore, Dockerfile, compose, docs) | Another Codex | g1-window | done | C11 | deployment materials ready for VPS |
-| T10 | VPS deployment | Another Codex | deploy-window | todo | C10 | deployed site + ops docs |
+| G4 | Repo cleanup and source-of-truth sync | Another Codex | g4-window | done | C12 | temp files removed, docs synced for Hermes redeploy |
+| T10 | VPS deployment | Another Codex | deploy-window | todo | C12 | deployed site + ops docs |
 | T11 | Final integration and maintenance docs | Another Codex | final-window | todo | T10 | smoke tests and runbook |
 
 ## Current Recommended Assignment
@@ -117,7 +119,10 @@ Whenever a task changes state:
 - 2026-04-11: `C11` completed by another Codex. AVE Bot API server adapter at `apps/web/src/lib/ave-bot-client.ts` with HMAC-SHA256 signing. 5 trade API routes: wallet/generate, wallet, approve, swap, orders. Token page trading panel with wallet onboarding, deposit prompt, approve, buy/sell with base token select, slippage slider, order status. V3 trade types in `packages/core`. All 10 local acceptance tests passed: API shapes correct, token scoring blocks unchanged, build and lint green.
 - 2026-04-11: `O6` completed by another Codex. Skill `meme-affinity-query` updated with 4 instructions: analyze (unchanged), approve, buy, sell. All trade instructions require explicit user confirmation ("确认"). Failure semantics defined for: no assetsId, user did not confirm, approve failed, swap failed, order pending. Amount conversion rules (18 decimals for BNB/USDT). Output templates match V3_TRADING_CONTRACT.md section 6.
 - 2026-04-11: `G1` completed by another Codex. Deployment materials: `.gitignore` updated (excludes .claude, ext-cz-skill-*, repo, dev-preview.log, .runtime), `Dockerfile` (multi-stage standalone Next.js build), `docker-compose.yml` (web service with runtime volume, env_file, healthcheck, restart policy), `.dockerignore`, `README.md` rewritten with full deploy instructions, `.env.example` expanded with all env vars and REQUIRED/OPTIONAL markers. `next.config.ts` updated with `output: "standalone"`. Build and lint green. `docker compose config` not verified locally (no Docker on Windows).
+- 2026-04-11: `C12` completed by another Codex. Added `fastMiniMaxCall<T>()` wrapper in `apps/web/src/lib/score-token.ts` with 8s deadline. Before: MiniMax worst case ~32s (16s timeout × 2 retries) per scoring call before fallback. After: fallback fires within 8s per call. API shape unchanged (`ScoreTokenResponse` same 7 keys). Fallback still works — deterministic rules used when MiniMax times out or fails. Build and lint green.
+- 2026-04-11: `C12` revision: replaced fake fast-fail with true provider-level fast-mode. Added `fastModeTimeoutMs` to `MiniMaxPersonaScorerOptions` in `packages/core/src/providers/minimax.ts`. When set: overrides timeout to 8s and disables retries entirely. `score-token.ts` now creates a fast-mode scorer instead of wrapping calls in a setTimeout race. Removed `fastMiniMaxCall` wrapper. Each MiniMax call site uses direct try/catch with exactly one fallback side effect. `score-address.ts` untouched (still uses 16s + retries). API shape unchanged. Build and lint green.
+- 2026-04-11: `G4` completed. Removed temp files `staged.txt` and `h -u origin main`. Docs synced: C12 revision complete, next step is Hermes redeploy (T10).
 
 ## Ready For Review
 
-- `C10`: Re-scope address flow back to pure wallet profile
+- none currently in review

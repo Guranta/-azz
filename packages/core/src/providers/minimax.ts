@@ -84,6 +84,12 @@ export interface MiniMaxPersonaScorerOptions {
   model?: string;
   timeoutMs?: number;
   fetchImpl?: FetchLike;
+  /**
+   * When set, overrides `timeoutMs` for the internal HTTP request and
+   * disables retries. Used by the token scoring path to enforce a hard
+   * 8s ceiling per MiniMax call.
+   */
+  fastModeTimeoutMs?: number;
 }
 
 export interface ScorePersonaWithMiniMaxInput {
@@ -783,7 +789,10 @@ export function createMiniMaxScorer(
     apiStyle,
   });
   const model = normalizeModel(options.model, plan);
-  const timeoutMs = normalizeTimeout(options.timeoutMs);
+  const effectiveTimeoutMs = options.fastModeTimeoutMs
+    ? normalizeTimeout(options.fastModeTimeoutMs)
+    : normalizeTimeout(options.timeoutMs);
+  const retriesEnabled = !options.fastModeTimeoutMs;
   const fetchImpl = options.fetchImpl ?? fetch;
 
   async function requestStructuredJsonOnce(input: {
@@ -792,7 +801,7 @@ export function createMiniMaxScorer(
     maxTokens: number;
   }): Promise<unknown> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutId = setTimeout(() => controller.abort(), effectiveTimeoutMs);
 
     try {
       if (apiStyle === "anthropic") {
@@ -916,6 +925,10 @@ export function createMiniMaxScorer(
     prompt: string;
     maxTokens: number;
   }): Promise<unknown> {
+    if (!retriesEnabled) {
+      return requestStructuredJsonOnce(input);
+    }
+
     let lastError: unknown;
     let attemptInput = input;
 

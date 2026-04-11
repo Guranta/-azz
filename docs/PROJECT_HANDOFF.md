@@ -145,12 +145,12 @@ The main coordinator no longer implements core V1 feature work directly. Earlier
 - `C8`: V2 arbitrary-address profile with MiniMax refinement
 - `C9`: local hardening before deployment
 - `C10`: address flow re-scoped back to pure wallet profile
+- `C12`: MiniMax fallback performance optimization
 
 Current next-step execution order is fixed:
 
-1. `C10` review
-2. `T10` deployment
-3. `T11` final docs
+1. `T10` deployment (H Hermes redeploy)
+2. `T11` final docs
 
 Task packets live in:
 
@@ -443,6 +443,16 @@ What is done right now:
   - `.env.example`: expanded with all env vars, REQUIRED/OPTIONAL markers, defaults documented
   - `next.config.ts` updated with `output: "standalone"` for Docker deployment
   - `O6` V3 skill integration is also complete: `meme-affinity-query` supports analyze, approve, buy, sell with confirmation model
+- `C12` MiniMax fallback performance optimization (revised) is now complete:
+  - Added `fastModeTimeoutMs` option to `MiniMaxPersonaScorerOptions` in `packages/core/src/providers/minimax.ts`
+  - When `fastModeTimeoutMs` is set: the provider uses that timeout instead of default 16s and disables retries (single attempt, no retry loop)
+  - Token scoring path (`score-token.ts`) creates a fast-mode scorer with 8s timeout; each MiniMax call is a direct try/catch with exactly one fallback side effect
+  - Address profiling path (`score-address.ts`) is untouched — still uses the default 16s timeout with retries
+  - Before revision: `fastMiniMaxCall` wrapper resolved fallback early but did not cancel the underlying HTTP request; the provider still ran its full 16s × 2 retries in the background
+  - After revision: the provider itself enforces 8s timeout with no retries — no background request continues after fallback
+  - No duplicate fallback side effects: each call site produces at most one error message
+  - API shape unchanged: `ScoreTokenResponse` same 7 top-level keys
+  - Build and lint green
 - `C9` local hardening is now complete:
   - tracked-address profile results are cached server-side with 10-minute TTL, keyed by tracked address id, reducing redundant AVE calls across V2 address queries
   - MiniMax default timeout increased from 12s to 16s; CZ persona max_tokens increased from 350 to 420
@@ -457,7 +467,7 @@ What is done right now:
 
 What is intentionally still pending:
 
-- VPS deployment (`T10`) — deployment materials are ready (Dockerfile, compose, docs)
+- VPS deployment (`T10`) — deployment materials are ready (Dockerfile, compose, docs); token path performance is the last pre-deploy validation gate
 - Final ops and maintenance docs (`T11`)
 - GitHub first push (see recommended commands below)
 
