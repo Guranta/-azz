@@ -1,0 +1,11 @@
+[
+  {
+    "id": "cz",
+    "name": "CZ",
+    "label": "CZ",
+    "enabled": true,
+    "description": "Primary public persona used to score whether a token matches CZ-style preferences.",
+    "logoKey": "persona-cz",
+    "logoMode": "asset"
+  }
+]

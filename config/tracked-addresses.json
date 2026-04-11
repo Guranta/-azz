@@ -1,0 +1,29 @@
+[
+  {
+    "id": "wangxiaoer",
+    "name": "王小二",
+    "label": "王小二",
+    "address": "0x176e6378b7c9010f0456bee76ce3039d36dc37c8",
+    "enabled": true,
+    "logoKey": "😎",
+    "logoMode": "emoji"
+  },
+  {
+    "id": "lengjing",
+    "name": "冷静",
+    "label": "冷静",
+    "address": "0xeb89055e16ae1c1e42ad6770a7344ff5c7b4f31d",
+    "enabled": true,
+    "logoKey": "🧊",
+    "logoMode": "emoji"
+  },
+  {
+    "id": "afeng",
+    "name": "阿峰",
+    "label": "阿峰",
+    "address": "0xbf004bff64725914ee36d03b87d6965b0ced4903",
+    "enabled": true,
+    "logoKey": "👿",
+    "logoMode": "emoji"
+  }
+]

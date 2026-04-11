@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-04-10T00:00:00Z",
+  "expiresAt": "2026-04-11T00:00:00Z",
+  "wallets": [
+    {
+      "address": "0x1111111111111111111111111111111111111111",
+      "tag": "Smart Whale 1",
+      "totalProfit": 182340.12,
+      "recentTradeCount": 18,
+      "dominantNarratives": ["animal", "ai", "community"],
+      "launchpadBias": {
+        "dominant": "fourmeme",
+        "fourmemeShare": 0.72,
+        "flapShare": 0.28
+      }
+    },
+    {
+      "address": "0x2222222222222222222222222222222222222222",
+      "tag": "Launch Sniper 9",
+      "totalProfit": 140220.55,
+      "recentTradeCount": 12,
+      "dominantNarratives": ["classic-meme", "animal", "community"],
+      "launchpadBias": {
+        "dominant": "balanced",
+        "fourmemeShare": 0.5,
+        "flapShare": 0.5
+      }
+    }
+  ]
+}

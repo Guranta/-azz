@@ -1,0 +1,4 @@
+interface:
+  display_name: "Smartmoney Daily"
+  short_description: "Internal 24-hour smart-money snapshot for fourmeme/flap meme wallets"
+  default_prompt: "Use $smartmoney-daily to build a daily internal snapshot from the AVE smart_wallet/list candidate set. Rank wallets by totalProfit, keep the top 30 wallets whose recent 30 trades still include at least one fourmeme or flap meme-token trade, then publish generatedAt, expiresAt, and wallets[] with dominant narratives and launchpad bias."

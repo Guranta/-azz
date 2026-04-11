@@ -1,0 +1,25 @@
+
+> @meme-affinity/web@0.1.0 dev
+> next dev --webpack -p 3200
+
+▲ Next.js 16.2.2 (webpack)
+- Local:         http://localhost:3200
+- Network:       http://100.67.64.89:3200
+- Environments: .env.local
+✓ Ready in 969ms
+⨯ Another next dev server is already running.
+
+- Local:        http://localhost:3000
+- PID:          20144
+- Dir:          C:\Users\gu'ran'ta\Desktop\龙虾skill\apps\web
+- Log:          .next\dev\logs\next-development.log
+
+Run taskkill /PID 20144 /F to stop it.
+[?25h
+npm error Lifecycle script `dev` failed with error:
+npm error code 1
+npm error path C:\Users\gu'ran'ta\Desktop\龙虾skill\apps\web
+npm error workspace @meme-affinity/web@0.1.0
+npm error location C:\Users\gu'ran'ta\Desktop\龙虾skill\apps\web
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c next dev --webpack -p 3200

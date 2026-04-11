@@ -1,0 +1,14 @@
+{
+  "name": "bsc-meme-affinity-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @meme-affinity/web run dev",
+    "build": "npm --workspace @meme-affinity/web run build",
+    "lint": "npm --workspace @meme-affinity/web run lint"
+  }
+}

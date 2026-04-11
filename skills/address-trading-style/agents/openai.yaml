@@ -1,0 +1,4 @@
+interface:
+  display_name: "Address Trading Style"
+  short_description: "Internal fixed-address capability for V1 tracked wallets"
+  default_prompt: "Use $address-trading-style only for the locked V1 tracked addresses 😎 王小二, 🧊 冷静, and 👿 阿峰. Start from the newest 100 AVE address/tx records, keep only fourmeme or flap meme-token trades, combine that filtered history with the current token narrative bundle, top100 whale state, and smartmoney intersection result, then emit the stable profile bundle and final MiniMax input package."

@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.env
+.env.local
+.env.production
+.claude
+dev-preview.log
+ext-cz-skill-a
+ext-cz-skill-b
+ext-cz-skill-c
+repo
+docs
+skills
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+{
+  "name": "@meme-affinity/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config/index.ts",
+    "./types": "./src/types/index.ts",
+    "./services": "./src/services/index.ts",
+    "./scoring": "./src/scoring/index.ts",
+    "./providers": "./src/providers/index.ts",
+    "./mock": "./src/mock/index.ts"
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "chain": "bsc",
+  "catalogVersion": "v1-fixed-addresses-2026-04-09",
+  "token_context": {
+    "tokenAddress": "0xbbb0000000000000000000000000000000000001",
+    "tokenName": "Dog Moon",
+    "tokenSymbol": "DOGMOON",
+    "launchpad": "fourmeme",
+    "currentCapBand": "microcap",
+    "narrativeBundle": {
+      "primary": ["animal", "meme"],
+      "secondary": ["community"],
+      "rawTags": ["animal", "meme", "community"]
+    }
+  },
+  "top100_context": {
+    "holdersSnapshotAt": "2026-04-10T10:00:00Z",
+    "trackedAddressHit": true,
+    "holderRank": 38
+  },
+  "smartmoney_context": {
+    "smartWalletSnapshotAt": "2026-04-10T10:00:00Z",
+    "trackedAddressHit": true,
+    "intersectionSource": "top100_holders_intersect_smart_wallet_list"
+  },
+  "tracked_address": {
+    "id": "wang-xiao-er",
+    "address": "0x176e6378b7c9010f0456bee76ce3039d36dc37c8",
+    "addressName": "王小二",
+    "emoji": "😎",
+    "logoKey": "wang-xiao-er",
+    "logoMode": "emoji"
+  },
+  "recent_history": {
+    "source": "ave_get_v2_address_tx",
+    "window": {
+      "limit": 100,
+      "from": "2026-04-03T00:00:00Z",
+      "to": "2026-04-10T00:00:00Z"
+    },
+    "rawTradeCount": 100,
+    "includedTradeCount": 5,
+    "excludedTradeCount": 95,
+    "excludeReasons": [
+      "not_fourmeme_or_flap_launch",
+      "not_meme_token"
+    ],
+    "trades": [
+      {
+        "txHash": "0xtx0001",
+        "timestamp": "2026-04-08T10:00:00Z",
+        "tokenAddress": "0xaaa0000000000000000000000000000000000001",
+        "tokenName": "Frog Hero",
+        "symbol": "FROG",
+        "side": "buy",
+        "amountUsd": 120.0,
+        "quantity": 1500000,
+        "launchpad": "fourmeme",
+        "isMemeLaunch": true,
+        "narrativeTags": ["animal", "meme"],
+        "entryMcapUsd": 180000.0,
+        "marketCapBand": "microcap",
+        "isClosedInWindow": false,
+        "realizedPnlUsd": 0.0,
+        "holdMinutes": 40,
+        "roiPct": 25.0
+      },
+      {
+        "txHash": "0xtx0002",
+        "timestamp": "2026-04-08T11:00:00Z",
+        "tokenAddress": "0xaaa0000000000000000000000000000000000002",
+        "tokenName": "Dog BSC",
+        "symbol": "DOGBSC",
+        "side": "buy",
+        "amountUsd": 90.0,
+        "quantity": 930000,
+        "launchpad": "fourmeme",
+        "isMemeLaunch": true,
+        "narrativeTags": ["animal", "community", "meme"],
+        "entryMcapUsd": 240000.0,
+        "marketCapBand": "microcap",
+        "isClosedInWindow": true,
+        "realizedPnlUsd": -9.0,
+        "holdMinutes": 80,
+        "roiPct": -10.0
+      },
+      {
+        "txHash": "0xtx0003",
+        "timestamp": "2026-04-08T13:00:00Z",
+        "tokenAddress": "0xaaa0000000000000000000000000000000000003",
+        "tokenName": "Cat X",
+        "symbol": "CATX",
+        "side": "buy",
+        "amountUsd": 110.0,
+        "quantity": 1040000,
+        "launchpad": "flap",
+        "isMemeLaunch": true,
+        "narrativeTags": ["animal", "meme"],
+        "entryMcapUsd": 310000.0,
+        "marketCapBand": "microcap",
+        "isClosedInWindow": false,
+        "realizedPnlUsd": 0.0,
+        "holdMinutes": 120,
+        "roiPct": 36.0
+      },
+      {
+        "txHash": "0xtx0004",
+        "timestamp": "2026-04-08T16:00:00Z",
+        "tokenAddress": "0xaaa0000000000000000000000000000000000004",
+        "tokenName": "AI Pup",
+        "symbol": "AIPUP",
+        "side": "buy",
+        "amountUsd": 160.0,
+        "quantity": 880000,
+        "launchpad": "fourmeme",
+        "isMemeLaunch": true,
+        "narrativeTags": ["ai", "animal", "meme"],
+        "entryMcapUsd": 420000.0,
+        "marketCapBand": "smallcap",
+        "isClosedInWindow": false,
+        "realizedPnlUsd": 0.0,
+        "holdMinutes": 75,
+        "roiPct": 30.0
+      },
+      {
+        "txHash": "0xtx0005",
+        "timestamp": "2026-04-08T18:00:00Z",
+        "tokenAddress": "0xaaa0000000000000000000000000000000000005",
+        "tokenName": "Pepe BSC",
+        "symbol": "PEPEBSC",
+        "side": "sell",
+        "amountUsd": 100.0,
+        "quantity": 600000,
+        "launchpad": "flap",
+        "isMemeLaunch": true,
+        "narrativeTags": ["animal", "classic-meme"],
+        "entryMcapUsd": 260000.0,
+        "marketCapBand": "microcap",
+        "isClosedInWindow": true,
+        "realizedPnlUsd": 25.0,
+        "holdMinutes": 60,
+        "roiPct": 25.0
+      }
+    ]
+  }
+}

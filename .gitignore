@@ -1,0 +1,39 @@
+node_modules/
+
+.env
+.env.local
+.env.production
+
+.next/
+dist/
+coverage/
+
+apps/web/node_modules/
+apps/web/.next/
+apps/web/.runtime/
+
+# AI tool directories
+.claude/
+
+# Dev logs
+*.log
+apps/web/*.log
+dev-preview.log
+
+# External skill repos (private reference material)
+ext-cz-skill-a/
+ext-cz-skill-b/
+ext-cz-skill-c/
+
+# Repo mirror
+repo/
+
+# accidental nested runtime mirror
+apps/web/apps/web/.runtime/
+apps/web/apps/web/.runtime/**
+
+__pycache__/
+*.pyc
+
+.DS_Store
+Thumbs.db
