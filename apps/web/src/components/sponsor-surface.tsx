@@ -49,13 +49,11 @@ export function SponsorSurface({ aveTotalCount }: SponsorSurfaceProps) {
       </div>
 
       <p className="text-[0.68rem] tracking-[0.06em] text-[var(--color-muted)]">
-        {"\u7d2f\u8ba1\u8c03\u7528"}
+        {"AVE API \u7d2f\u8ba1\u8c03\u7528\u6b21\u6570"}
         {" "}
         <span className="font-semibold text-[var(--color-ink-soft)]">
           {aveDisplayCount.toLocaleString("zh-CN")}
         </span>
-        {" "}
-        {"\u6b21"}
       </p>
     </footer>
   );

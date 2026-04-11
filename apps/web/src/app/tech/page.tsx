@@ -1,6 +1,8 @@
 ﻿import { SiteNav } from "@/components/site-nav";
 import { createMetricsRecorder } from "@/lib/runtime-metrics";
 
+export const revalidate = 3600;
+
 const TOP_BADGES = ["CZ", "\u806a\u660e\u94b1", "\u8f66\u5934"] as const;
 
 const FLOW_STEPS = [
@@ -131,7 +133,7 @@ export default function TechPage() {
       </section>
 
       <section className="surface-card mt-8 reveal-up px-6 py-7 md:px-7">
-        <p className="section-kicker">{"AVE API \u771f\u5b9e\u7d2f\u8ba1\u8c03\u7528\u6b21\u6570"}</p>
+        <p className="section-kicker">{"AVE API \u771f\u5b9e\u7d2f\u8ba1\u8c03\u7528\u6b21\u6570\uff08\u6bcf\u4e00\u5c0f\u65f6\u4e00\u66f4\u65b0\uff09"}</p>
         <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-8 text-center">
           <p className="text-5xl font-semibold text-[var(--color-accent)]">
             {totalCount.toLocaleString("zh-CN")}

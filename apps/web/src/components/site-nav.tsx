@@ -4,6 +4,7 @@ type SiteNavProps = {
   current?: "home" | "tech" | "token";
   ctaHref?: string;
   ctaLabel?: string;
+  showTechLink?: boolean;
 };
 
 function navClass(isActive: boolean): string {
@@ -12,7 +13,12 @@ function navClass(isActive: boolean): string {
     : "border-white/8 bg-white/4 text-[var(--color-ink-soft)] hover:border-white/14 hover:bg-white/8 hover:text-[var(--color-ink)]";
 }
 
-export function SiteNav({ current, ctaHref, ctaLabel }: SiteNavProps) {
+export function SiteNav({
+  current,
+  ctaHref,
+  ctaLabel,
+  showTechLink = true,
+}: SiteNavProps) {
   return (
     <header className="mb-8 flex flex-col gap-5 rounded-[28px] border border-white/10 bg-[rgba(7,14,25,0.72)] px-5 py-4 backdrop-blur md:flex-row md:items-center md:justify-between md:px-6">
       <div className="flex items-center gap-3">
@@ -36,12 +42,14 @@ export function SiteNav({ current, ctaHref, ctaLabel }: SiteNavProps) {
         >
           首页
         </Link>
-        <Link
-          href="/tech"
-          className={`rounded-full border px-4 py-2 text-sm transition ${navClass(current === "tech")}`}
-        >
-          技术说明
-        </Link>
+        {showTechLink ? (
+          <Link
+            href="/tech"
+            className={`rounded-full border px-4 py-2 text-sm transition ${navClass(current === "tech")}`}
+          >
+            技术说明
+          </Link>
+        ) : null}
         {ctaHref && ctaLabel ? (
           <Link
             href={ctaHref}

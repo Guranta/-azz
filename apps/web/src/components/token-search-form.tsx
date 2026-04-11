@@ -3,11 +3,6 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState, useCallback } from "react";
 
-/**
- * Shared query card with animated submit button.
- * - mode="token"  → navigates to /token/[query]
- * - mode="address" → navigates to /address/[query]
- */
 type QueryCardProps = {
   mode: "token" | "address";
   title: string;
@@ -17,26 +12,25 @@ type QueryCardProps = {
 export function QueryCard({ mode, title, placeholder }: QueryCardProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [pressing, setPressing] = useState(false);
+  const [navigating, setNavigating] = useState(false);
 
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const trimmed = query.trim();
-      if (!trimmed) return;
+      if (!trimmed || navigating) return;
 
-      setPressing(true);
+      setNavigating(true);
       const destination =
         mode === "token"
           ? `/token/${encodeURIComponent(trimmed)}`
           : `/address/${encodeURIComponent(trimmed)}`;
 
-      // Short delay so the press animation is visible (150-200ms)
       setTimeout(() => {
         router.push(destination);
-      }, 180);
+      }, 200);
     },
-    [query, mode, router],
+    [query, mode, router, navigating],
   );
 
   const isToken = mode === "token";
@@ -50,7 +44,7 @@ export function QueryCard({ mode, title, placeholder }: QueryCardProps) {
           : "border-white/8 bg-[linear-gradient(180deg,rgba(13,23,40,0.86)_0%,rgba(8,15,28,0.8)_100%)] shadow-[0_24px_80px_rgba(1,5,16,0.32)]"
       }`}
     >
-      {/* Decorative glow blobs — only on token card */}
+      {/* Decorative glow blobs — token card only */}
       {isToken && (
         <>
           <div className="pointer-events-none absolute left-[-6%] top-[-16%] h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(244,199,106,0.22)_0%,transparent_70%)] blur-3xl" />
@@ -76,26 +70,48 @@ export function QueryCard({ mode, title, placeholder }: QueryCardProps) {
             aria-label={placeholder}
             autoComplete="off"
             spellCheck={false}
+            disabled={navigating}
           />
 
           <button
             type="submit"
-            disabled={pressing}
+            disabled={navigating}
             className={[
               "flex items-center justify-center rounded-[20px] px-7 py-3.5 text-sm font-semibold transition-all duration-200",
               "bg-[linear-gradient(135deg,#f4c76a_0%,#ff9b62_100%)] text-[var(--color-accent-ink)]",
               "shadow-[0_14px_34px_rgba(244,199,106,0.24)]",
               "hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_18px_42px_rgba(244,199,106,0.32)]",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-solid)]",
-              pressing
-                ? "scale-[0.94] brightness-110 shadow-[0_6px_16px_rgba(244,199,106,0.36)]"
-                : "active:scale-[0.94] active:brightness-110",
+              "active:scale-[0.94] active:brightness-110",
             ].join(" ")}
           >
             {"\u5f00\u67e5"}
           </button>
         </div>
       </div>
+
+      {/* ── Waiting overlay ── */}
+      {navigating && (
+        <div className="waiting-overlay absolute inset-0 z-20 flex flex-col items-center justify-center rounded-[inherit] backdrop-blur-[8px]">
+          {/* Ambient glow */}
+          <div className="pointer-events-none absolute left-[18%] top-[-8%] h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(244,199,106,0.22)_0%,transparent_70%)] blur-2xl" />
+          <div className="pointer-events-none absolute bottom-[-6%] right-[16%] h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(122,215,255,0.16)_0%,transparent_70%)] blur-2xl" />
+
+          <div className="relative text-center">
+            <div className="loading-ring mx-auto mb-6 h-14 w-14">
+              <div className="loading-ring-track" />
+              <div className="loading-ring-fill" />
+            </div>
+
+            <p className="display-copy text-xl font-semibold tracking-tight text-[var(--color-ink)]">
+              {isToken ? "AI\u5206\u6790\u4e2d" : "\u5730\u5740\u753b\u50cf\u751f\u6210\u4e2d"}
+            </p>
+            <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
+              {"\u9884\u8ba1\u9700\u8981 1 \u5206\u949f"}
+            </p>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

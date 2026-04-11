@@ -2,6 +2,8 @@ import { SponsorSurface } from "@/components/sponsor-surface";
 import { QueryCard } from "@/components/token-search-form";
 import { createMetricsRecorder } from "@/lib/runtime-metrics";
 
+export const revalidate = 3600;
+
 function getAveMetricsSnapshot() {
   try {
     const recorder = createMetricsRecorder();
@@ -30,8 +32,8 @@ export default function Home() {
         />
       </div>
 
-      {/* Secondary card — address profile (narrower on desktop, full-width mobile) */}
-      <div className="mt-4 w-full reveal-up md:mt-5 md:max-w-[70%]">
+      {/* Secondary card — address profile (narrower on larger screens) */}
+      <div className="mt-4 w-full reveal-up md:mt-5 md:max-w-[80%] lg:max-w-[67%]">
         <QueryCard
           mode="address"
           title={"\u8fd9\u4e2a\u5730\u5740\u753b\u50cf\u2b50"}

@@ -79,19 +79,6 @@ function getRiskBadgeTone(riskLevel: string) {
   }
 }
 
-function getLaunchpadTone(launchpad: string) {
-  switch (launchpad) {
-    case "fourmeme":
-      return "border-amber-300/30 bg-amber-300/10 text-amber-100";
-    case "flap":
-      return "border-sky-300/30 bg-sky-300/10 text-sky-100";
-    case "mixed":
-      return "border-slate-300/30 bg-slate-300/10 text-slate-100";
-    default:
-      return "border-white/10 bg-white/5 text-[var(--color-ink-soft)]";
-  }
-}
-
 function formatPercentage(value: number | null) {
   if (value === null) {
     return "n/a";
@@ -238,14 +225,6 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
               <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
                 <span className="text-[var(--color-muted)]">代币符号</span>
                 <span className="text-[var(--color-ink)]">{token.symbol || "n/a"}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
-                <span className="text-[var(--color-muted)]">发射平台</span>
-                <span
-                  className={`rounded-full border px-2 py-1 text-xs uppercase tracking-[0.2em] ${getLaunchpadTone(token.launchpad)}`}
-                >
-                  {token.launchpad}
-                </span>
               </div>
               <div className="flex items-center justify-between gap-4 rounded-[18px] border border-white/10 bg-white/5 px-4 py-3">
                 <span className="text-[var(--color-muted)]">风险等级</span>
