@@ -2,6 +2,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Native build tools for better-sqlite3
+RUN apk add --no-cache python3 make g++
+
 # Copy workspace manifests
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
@@ -37,7 +40,7 @@ COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static apps/web/.next/static
 COPY --from=builder /app/apps/web/public apps/web/public
 
-# Runtime directory for AVE metrics and smartmoney snapshots
+# Runtime directory for AVE metrics, smartmoney snapshots, and credential DB
 RUN mkdir -p /app/apps/web/.runtime && \
     chown nextjs:nodejs /app/apps/web/.runtime
 

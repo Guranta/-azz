@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import {
   AveBotConfigError,
   AveBotApiError,
-  createAveBotClientFromEnv,
 } from "@/lib/ave-bot-client";
+import { resolveAveBotClient } from "@/lib/resolve-trade-credential";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const ids = url.searchParams.get("ids")?.trim();
+  const bindingCode = url.searchParams.get("bindingCode")?.trim();
 
   if (!ids) {
     return NextResponse.json(
@@ -16,9 +17,24 @@ export async function GET(request: Request) {
     );
   }
 
+  if (!bindingCode) {
+    return NextResponse.json(
+      { error: "bindingCode is required for order queries" },
+      { status: 400 }
+    );
+  }
+
   try {
-    const client = createAveBotClientFromEnv();
-    const orders = await client.getSwapOrders(ids);
+    const resolved = resolveAveBotClient({ bindingCode });
+
+    if (!resolved) {
+      return NextResponse.json(
+        { error: "Invalid or inactive bindingCode", code: "BINDING_NOT_FOUND" },
+        { status: 404 }
+      );
+    }
+
+    const orders = await resolved.client.getSwapOrders(ids);
     return NextResponse.json({ orders });
   } catch (error) {
     if (error instanceof AveBotConfigError) {

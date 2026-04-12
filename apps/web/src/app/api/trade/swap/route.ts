@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import {
   AveBotConfigError,
   AveBotApiError,
-  createAveBotClientFromEnv,
 } from "@/lib/ave-bot-client";
+import { resolveAveBotClient } from "@/lib/resolve-trade-credential";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     baseToken?: string;
     slippageBps?: number;
     confirmToken?: string;
+    bindingCode?: string;
   } | null;
 
   const assetsId = body?.assetsId?.trim();
@@ -23,11 +24,12 @@ export async function POST(request: Request) {
   const baseToken = body?.baseToken?.trim() || "bnb";
   const slippageBps = body?.slippageBps;
   const confirmToken = body?.confirmToken?.trim();
+  const bindingCode = body?.bindingCode?.trim();
 
   // Validation
-  if (!assetsId || !tokenAddress || !side || !amount || slippageBps === undefined || !confirmToken) {
+  if ((!assetsId && !bindingCode) || !tokenAddress || !side || !amount || slippageBps === undefined || !confirmToken) {
     return NextResponse.json(
-      { error: "assetsId, tokenAddress, side, amount, slippageBps, and confirmToken are required" },
+      { error: "bindingCode (V4) or assetsId (V3), tokenAddress, side, amount, slippageBps, and confirmToken are required" },
       { status: 400 }
     );
   }
@@ -76,9 +78,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    const client = createAveBotClientFromEnv();
-    const result = await client.sendSwapOrder({
-      assetsId,
+    const resolved = resolveAveBotClient({ assetsId, bindingCode });
+
+    if (!resolved) {
+      if (bindingCode) {
+        return NextResponse.json(
+          { error: "Invalid or inactive bindingCode", code: "BINDING_NOT_FOUND" },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json(
+        { error: "AVE Bot API not configured on server (V3 fallback unavailable)", code: "NO_ENV_CONFIG" },
+        { status: 401 }
+      );
+    }
+
+    const result = await resolved.client.sendSwapOrder({
+      assetsId: resolved.assetsId,
       tokenAddress,
       side: side as "buy" | "sell",
       amount,

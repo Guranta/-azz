@@ -2,7 +2,7 @@
 name: meme-affinity-query
 description: |
   Public OpenClaw skill for BSC meme token analysis and trading.
-  Supports four instructions: analyze, approve, buy, sell.
+  Supports five instructions: analyze, bind, approve, buy, sell.
   All heavy logic stays on the website side.
   Trade instructions require explicit user confirmation.
 ---
@@ -13,10 +13,11 @@ Public OpenClaw skill for the project.
 
 ## Purpose
 
-- Accept BSC token operations (analyze, approve, buy, sell)
-- Route to website API endpoints
-- Return compact summaries
-- Require explicit confirmation for all on-chain operations
+- Accept BSC token operations (`analyze`, `bind`, `approve`, `buy`, `sell`)
+- Route to website API endpoints only
+- Keep all heavy logic on the website side
+- Keep trade flows binding-state driven, so users do not need to input `assetsId` for every trade
+- Return compact outputs with explicit state labels
 
 ## Scope Rules
 
@@ -24,11 +25,74 @@ This skill stays thin.
 
 - Do not run AVE logic inside the skill
 - Do not run DeepSeek or MiniMax logic inside the skill
-- Do not perform local persona or address scoring
-- Do not recompute smartmoney logic inside the skill
+- Do not perform local persona/address scoring
 - Do not call `bot-api.ave.ai` directly
-- Do not hold AVE credentials
-- Treat the website API as the only source of truth
+- Do not hold AVE credentials or any other secrets
+- Treat website API as the only source of truth
+- Per-user key mode depends on website-side binding/config already being valid
+- Keep `analyze` independent from binding state
+- Skill-facing identity fields are only:
+  - `bindingCode`
+  - `小龙虾 ID` (same value as `bindingCode`, user-facing alias)
+- `bindingCode` / `小龙虾 ID` is the only external binding entry accepted by the skill
+- Do not ask users to manually input `assetsId` in normal skill flows
+- `assetsId` may exist server-side, but must be treated as internal and should not be required in normal skill commands
+
+## Supported Instructions
+
+- `analyze <token>`
+- `bind <bindingCode>`
+- `approve <token>`
+- `buy <token> <amount> <baseToken>`
+- `sell <token> <amount> <baseToken>`
+
+No additional instruction families are introduced.
+
+## Output State Labels (Mandatory)
+
+All trade-related outputs must clearly map to one of these labels:
+
+- `未绑定`
+- `已绑定`
+- `待确认`
+- `成功`
+- `失败`
+
+## Binding State Model
+
+Runtime state is conversation/session scoped.
+
+- `UNBOUND`: no active binding code in current conversation
+- `BOUND`: `bind` verified with website API and saved in session
+
+State transitions:
+
+- `UNBOUND -> BOUND`: `bind <bindingCode>` success and returned status is `active`
+- `BOUND -> UNBOUND`: bind replaced/cleared, or bind verification fails on later operations
+
+## Website Dependency and Degradation Rules
+
+The skill must not assume website backend stability.
+
+- `bind`, `approve`, `buy`, `sell` all depend on website API availability and correctness
+- Per-user key mode is considered available only after website binding succeeds
+- If website binding/trade APIs return non-success or timeout, render `失败` (not `成功`)
+- Never infer a successful bind/trade from partial or missing response fields
+- Keep failure outputs actionable, but do not invent backend state
+
+## Website-First Onboarding (V4 Main Flow)
+
+Before any trade instruction in the skill, user onboarding happens on the website side:
+
+1. User opens website trade config and enters their own API key/secret.
+2. Website config supports two backend paths:
+   - User provides an existing `assetsId`.
+   - User does not provide `assetsId`, and website uses user key to generate wallet automatically.
+3. Website returns/exposes `bindingCode` (`小龙虾 ID`) for the user.
+4. User runs `bind <bindingCode>` in the skill to enter bound state.
+
+Skill-side rule:
+- Normal skill flow never asks user to input `assetsId`; external binding entry remains only `bindingCode` / `小龙虾 ID`.
 
 ## Instructions
 
@@ -36,149 +100,185 @@ This skill stays thin.
 
 Token analysis. Calls website `/api/score-token`.
 
-**Parameters:** one BSC token contract address
+**Binding dependency:** none.
 
-**Required user input:**
-- `tokenAddress`: BSC token contract address
+**Parameters:** one BSC token contract address (`tokenAddress`)
 
 **Optional user input:**
 - `websiteBaseUrl`: override for custom deployment
 
 **Execution:**
 
-1. Validate that `tokenAddress` looks like a BSC address
-2. Build result page URL: `/token/{tokenAddress}`
-3. Call `POST {websiteBaseUrl}/api/score-token` with `{ tokenAddress, chain: "bsc" }`
-4. Parse response and extract key fields
-5. Render analysis output template
+1. Validate `tokenAddress` format.
+2. Call `POST {websiteBaseUrl}/api/score-token` with `{ tokenAddress, chain: "bsc" }`.
+3. Parse response and render compact summary.
 
-**Analysis output template:**
+**Analysis output template (compact):**
 
-```
-📊 {token.name} ({token.symbol})
-
-👍 CZ: {score}/100 ({displayLevel})
-🧠 聪明钱: {matchedCount} matched ({displayLevel})
-🎯 建议: {recommendation}
-
-🔗 {website_url}/token/{address}
+```text
+📳 {token.name} ({token.symbol})
+🤤 CZ: {score}/100 ({displayLevel})
+🦥 聪明钱: {matchedCount} matched ({displayLevel})
+🎆 建议: {recommendation}
+🔆 {website_url}/token/{address}
 ```
 
-Maximum 5 lines. No evidence list.
+Maximum 5 lines.
 
-**Label rendering:**
-- `NO_LOVE` → `不爱`
-- `LOVE` → `爱`
-- `LOVE_LOVE` → `爱爱`
-- Use API-provided emoji fields
+---
 
-**Extended analysis output (optional, when user asks for detail):**
+### `bind <bindingCode>`
 
+Bind OpenClaw skill context to website trade credentials.
+
+**Parameters:**
+- `bindingCode`: the user-provided binding string (also called `小龙虾 ID`)
+
+**Execution:**
+
+1. Validate `bindingCode` is non-empty.
+2. Call `POST {websiteBaseUrl}/api/trade/bind` with `{ bindingCode }`.
+3. If response is 200 and `status === "active"`, save binding in session state.
+4. If response is 404, treat as invalid binding.
+5. If response is 200 but `status !== "active"`, treat as bind failure.
+6. If response timeout/network error/5xx/invalid payload, treat as bind failure and keep state `UNBOUND`.
+
+**Bind success output (`已绑定`):**
+
+```text
+✅ 已绑定
+小龙虾 ID: {bindingCode}
+状态: 已绑定
+后续可直接使用 approve / buy / sell（无需输入 assetsId）
 ```
-Token: {name} ({symbol})
-Narratives: {tag1}, {tag2}, {tag3}
-👍 CZ: {emoji} {不爱/爱/爱爱}
-聪明钱: {emoji} {不爱/爱/爱爱} (hits: {n})
-😎 王小二: {emoji} {不爱/爱/爱爱}
-🧊 冷静: {emoji} {不爱/爱/爱爱}
-👿 阿峰: {emoji} {不爱/爱/爱爱}
-🐳: {有 #rank / 无}
-Result: {url}
+
+**Bind failure output (`失败`, invalid binding):**
+
+```text
+❌ 绑定失败
+小龙虾 ID: {bindingCode}
+原因: 无效或不存在的 bindingCode
+请在网站交易配置页复制最新“小龙虾 ID”后重试
 ```
+
+**Bind failure output (`失败`, non-active credential):**
+
+```text
+❌ 绑定失败
+小龙虾 ID: {bindingCode}
+原因: 凭证状态不是 active
+请在网站启用该配置后重试
+```
+
+**Bind failure output (`失败`, website unavailable / unstable):**
+
+```text
+❌ 绑定失败
+小龙虾 ID: {bindingCode}
+原因: 网站绑定服务暂不可用或返回异常
+请稍后重试；成功前不会进入已绑定状态
+```
+
+---
+
+## Shared Trade Preconditions (`approve` / `buy` / `sell`)
+
+1. Require current session to be `BOUND`.
+2. If not bound, return onboarding gate and stop.
+3. Always require explicit user confirmation before any on-chain action.
+4. For API calls, send `bindingCode` as the binding anchor.
+5. Do not require user to provide `assetsId` per operation.
+
+**No-binding onboarding output (`未绑定`):**
+
+```text
+⚠️ 未绑定
+请先绑定小龙虾 ID（bindingCode）后再交易
+发送：bind <bindingCode>
+如果还没有小龙虾 ID，请先在网站交易配置页完成配置并复制该 ID
+```
+
+**Shared confirmation gate (`待确认`):**
+
+```text
+🟡 待确认
+小龙虾 ID: {bindingCode}
+操作: {approve/buy/sell}
+回复“确认”执行，回复“取消”放弃
+```
+
+If user response is not exact `确认`, cancel immediately and do not call trade API.
 
 ---
 
 ### `approve <token>`
 
-Approve AVE spender for a token. Requires user confirmation.
+Approve AVE spender for token sell.
 
-**Parameters:** BSC token contract address
-
-**Required user input:**
+**Parameters:**
 - `tokenAddress`: BSC token contract address
-- `assetsId`: user's AVE bot wallet ID
-
-**Pre-condition:** user must provide `assetsId`
 
 **Execution:**
 
-1. Check `assetsId` is provided. If missing, return onboarding gate message.
-2. Show confirmation prompt to user.
-3. Wait for explicit confirmation ("确认").
-4. If user confirms: call `POST {websiteBaseUrl}/api/trade/approve` with `{ assetsId, tokenAddress }`
-5. Render result
+1. Enforce shared trade preconditions.
+2. Ask confirmation.
+3. If confirmed, call `POST {websiteBaseUrl}/api/trade/approve` with:
+   ```json
+   {
+     "bindingCode": "...",
+     "tokenAddress": "..."
+   }
+   ```
+4. Render success or failure.
 
-**Approve confirmation prompt:**
+**Approve success output (`成功`):**
 
-```
-⚠️ 确认授权？
-
+```text
+✅ 成功
+操作: approve
 代币: {tokenAddress}
-操作: 授权 AVE 合约花费该代币
-钱包: {truncated assetsId}
-
-回复"确认"执行，回复"取消"放弃。
-```
-
-**Approve success output:**
-
-```
-✅ 已授权 {token}
+订单: {orderId}
 spender: {spender}
-order: {orderId}
 ```
 
-**Approve failure output:**
+**Approve failure output (`失败`):**
 
-```
-❌ 授权失败
-
+```text
+❌ 失败
+操作: approve
 代币: {tokenAddress}
 原因: {sanitized error message}
-
-请检查钱包是否有效，或稍后重试。
 ```
 
 ---
 
 ### `buy <token> <amount> <baseToken>`
 
-Buy (swap BNB/USDT → token). Requires user confirmation.
+Swap BNB/USDT to target token.
 
 **Parameters:**
 - `tokenAddress`: BSC token contract address
 - `amount`: human-readable amount (e.g. `0.1`, `100`)
 - `baseToken`: `bnb` or `usdt`
 
-**Required user input:**
-- `tokenAddress`
-- `amount`
-- `baseToken`
-- `assetsId`: user's AVE bot wallet ID
-
 **Defaults:**
-- `slippageBps`: 500 (5%) if user does not specify
-- `baseToken`: `bnb` if user does not specify
+- `baseToken`: `bnb`
+- `slippageBps`: `500`
 
 **Amount conversion:**
-
-The skill converts human-readable amounts to smallest unit:
-- BNB: 18 decimals → multiply by 10^18
-- USDT: 18 decimals → multiply by 10^18
-- Example: `0.1` BNB → `"100000000000000000"`
+- BNB: multiply by `10^18`
+- USDT: multiply by `10^18`
 
 **Execution:**
 
-1. Check `assetsId` is provided. If missing, return onboarding gate message.
-2. Validate amount is a positive number.
-3. Validate baseToken is `bnb` or `usdt`.
-4. Convert amount to smallest unit.
-5. Show confirmation prompt to user.
-6. Wait for explicit confirmation ("确认").
-7. If user confirms: call `POST {websiteBaseUrl}/api/trade/swap` with:
+1. Enforce shared trade preconditions.
+2. Validate `amount > 0` and `baseToken` in `bnb|usdt`.
+3. Convert amount to smallest unit string.
+4. Ask confirmation.
+5. If confirmed, call `POST {websiteBaseUrl}/api/trade/swap`:
    ```json
    {
-     "assetsId": "...",
+     "bindingCode": "...",
      "tokenAddress": "...",
      "side": "buy",
      "amount": "<smallest unit>",
@@ -187,165 +287,111 @@ The skill converts human-readable amounts to smallest unit:
      "confirmToken": "<must match tokenAddress>"
    }
    ```
-8. Render result
-
-**Buy confirmation prompt:**
-
-```
-⚠️ 确认买入？
-
-代币: {tokenAddress}
-数量: {amount} {baseToken}
-滑点: {slippageBps / 100}%
-钱包: {truncated assetsId}
-
-回复"确认"执行，回复"取消"放弃。
-```
+6. Read immediate order result and map status output.
+7. Optionally call `GET {websiteBaseUrl}/api/trade/orders?ids={orderId}&bindingCode={bindingCode}` for fresh status.
 
 ---
 
 ### `sell <token> <amount> <baseToken>`
 
-Sell (swap token → BNB/USDT). Requires user confirmation.
+Swap token to BNB/USDT.
 
 **Parameters:**
 - `tokenAddress`: BSC token contract address
-- `amount`: human-readable amount of the token to sell
-- `baseToken`: `bnb` or `usdt` (which base token to receive)
-
-**Required user input:**
-- `tokenAddress`
-- `amount`
-- `assetsId`: user's AVE bot wallet ID
+- `amount`: human-readable token amount
+- `baseToken`: `bnb` or `usdt`
 
 **Defaults:**
-- `slippageBps`: 500 (5%) if user does not specify
-- `baseToken`: `bnb` if user does not specify
+- `baseToken`: `bnb`
+- `slippageBps`: `500`
 
-**Pre-condition:** token must be approved first (via `approve` instruction)
+**Pre-condition:** token must be approved first.
 
 **Execution:**
 
-Same flow as `buy`, but with `side: "sell"`.
+Same flow as `buy`, but `side: "sell"`.
 
-**Sell confirmation prompt:**
-
-```
-⚠️ 确认卖出？
-
-代币: {tokenAddress}
-数量: {amount} tokens → {baseToken}
-滑点: {slippageBps / 100}%
-钱包: {truncated assetsId}
-
-回复"确认"执行，回复"取消"放弃。
-```
+If API returns `Token not approved yet (sell requires approve first)`, render failure with explicit remediation (`先执行 approve`).
 
 ---
 
-### Trade result output (shared for buy/sell)
+## Trade Status Rendering (`buy` / `sell`)
 
-```
-✅ {买入/卖出} {token}
+Map website order status to required output labels:
 
+- `generated` -> `待确认`
+- `sent` -> `待确认`
+- `confirmed` -> `成功`
+- `error` -> `失败`
+
+**Pending order output (`待确认`):**
+
+```text
+🟡 待确认
+操作: {buy/sell}
+代币: {tokenAddress}
 订单: {orderId}
-状态: {status}
-
-🔗 {website_url}/token/{address}
+状态: {generated|sent}
+链上确认中，请稍后查询
 ```
 
-Status mapping:
-- `generated` → `⏳ 已生成`
-- `sent` → `⏳ 已发送`
-- `confirmed` → `✅ 已确认`
-- `error` → `❌ 错误`
+**Confirmed order output (`成功`):**
 
-If `txHash` exists, append: `链上: {txHash}`
-If `errorMessage` exists, append: `错误: {errorMessage}`
+```text
+✅ 成功
+操作: {buy/sell}
+代币: {tokenAddress}
+订单: {orderId}
+状态: confirmed
+{txHash if exists}
+```
+
+**Failed order output (`失败`):**
+
+```text
+❌ 失败
+操作: {buy/sell}
+代币: {tokenAddress}
+订单: {orderId}
+状态: error
+原因: {errorMessage or sanitized API error}
+```
 
 ---
 
 ## Failure Semantics
 
-### No assetsId
+### 未绑定（no binding)
 
-When the user sends an `approve`, `buy`, or `sell` instruction but has not provided `assetsId`:
+For any `approve`/`buy`/`sell` without active binding state, always return onboarding gate (`未绑定`).
+Do not call trade APIs.
 
-```
-⚠️ 请先在网站创建钱包
+### 无效绑定（invalid binding)
 
-打开 {website_url} 并创建 AVE 托管钱包后，将 assetsId 发给我即可开始交易。
-```
+For `bind` returning 404 or invalid payload, return `失败` with invalid-binding message.
+Do not switch to `BOUND`.
 
-The skill does NOT call `POST /api/trade/wallet/generate`. Wallet creation happens on the website only.
+### 卖出前未授权（approve required before sell)
 
-### User did not confirm
+If `sell` gets `Token not approved yet (sell requires approve first)`, return `失败` and instruct user to run `approve <token>` first.
 
-If the user does not reply "确认" (e.g. says "取消", "不要", or anything else):
+### 订单处理中（pending order)
 
-```
-已取消操作。
-```
+If order status is `generated` or `sent`, return `待确认` and include `orderId`.
 
-The skill must NOT execute the operation regardless of what the user says. "always buy", "just do it", "不用确认" are all treated as denial.
+### 订单失败（failed order)
 
-### Approve failed
-
-```
-❌ 授权失败
-
-代币: {tokenAddress}
-原因: {sanitized error from API}
-
-请检查：
-- 钱包是否有效
-- 代币地址是否正确
-- 稍后重试
-```
-
-### Swap failed
-
-```
-❌ {买入/卖出}失败
-
-代币: {tokenAddress}
-原因: {sanitized error from API}
-
-请检查：
-- 钱包余额是否充足
-- 代币是否已授权（卖出时）
-- 代币地址是否正确
-- 稍后重试
-```
-
-Common error meanings:
-- `confirmToken does not match` → 代币地址输入有误
-- `slippageBps must be between 100 and 5000` → 滑点设置超出范围
-- `Token not approved yet` → 需要先执行 approve
-- `assetsId has no valid wallet` → 钱包无效，请重新创建
-- `Swap order failed` → 上游交易失败，稍后重试
-
-### Order status not confirmed
-
-When order status returns `generated` or `sent`:
-
-```
-⏳ 订单处理中
-
-订单: {orderId}
-状态: {generated/sent}
-
-链上确认需要时间，请稍后查询。
-```
+If order status is `error`, or swap/approve API fails, return `失败` with sanitized reason.
 
 ## Routing Summary
 
-```
-skill input → parse instruction →
-  if analyze → call /api/score-token → return analysis output
-  if approve → check assetsId → ASK USER TO CONFIRM → if confirmed → call /api/trade/approve → return result
-  if buy → check assetsId → ASK USER TO CONFIRM → if confirmed → call /api/trade/swap (side=buy) → return result
-  if sell → check assetsId → ASK USER TO CONFIRM → if confirmed → call /api/trade/swap (side=sell) → return result
+```text
+skill input -> parse instruction ->
+  if analyze -> call /api/score-token -> return analysis
+  if bind -> call /api/trade/bind -> set binding state -> return 已绑定/失败
+  if approve -> require binding -> require explicit confirm -> call /api/trade/approve with bindingCode -> return 成功/失败
+  if buy -> require binding -> require explicit confirm -> call /api/trade/swap(side=buy,bindingCode) -> return 待确认/成功/失败
+  if sell -> require binding -> require explicit confirm -> call /api/trade/swap(side=sell,bindingCode) -> return 待确认/成功/失败
 ```
 
 ## Default Base URL
@@ -356,10 +402,10 @@ skill input → parse instruction →
 ## Constraints
 
 - BSC only
-- No browser wallet (MetaMask, WalletConnect)
+- No browser wallet integration
 - No auto-trading, no silent trades
 - No multi-chain
 - No limit orders
 - No auto-sell / stop-loss
-- Do not change token / address API
+- Do not change token/address API
 - Do not change website trade contract

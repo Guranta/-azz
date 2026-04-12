@@ -36,7 +36,7 @@ const SCORE_CHANNELS = [
 function getAveMetricsSnapshot() {
   try {
     const recorder = createMetricsRecorder();
-    return recorder.getSnapshot();
+    return recorder.getMetrics();
   } catch {
     return null;
   }

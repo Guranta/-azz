@@ -281,31 +281,60 @@ MINIMAX_MODEL = MiniMax-M2.7
 
 ---
 
-## 5. Trading Architecture (V3)
+## 5. Trading Architecture (V3 Live, V4 Planned)
 
-### 5.1 Overview
+### 5.1 V3 Status (already implemented)
 
-V3 adds real BSC trading via the **AVE Bot Wallet API**. The website server holds all AVE credentials; the browser and skill never see keys.
+V3 real BSC trading is implemented and available through the **AVE Bot Wallet API**:
 
-### 5.2 Trade Endpoints
+- Trade endpoints: `/api/trade/wallet/generate`, `/api/trade/wallet`, `/api/trade/approve`, `/api/trade/swap`, `/api/trade/orders`
+- Wallet binding key in browser: `assetsId` (localStorage)
+- Credential mode: platform-level `AVE_BOT_API_KEY` + `AVE_BOT_API_SECRET` configured on the server
+- `wallet/generate` is retained as the V3 legacy bootstrap path.
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/trade/wallet/generate` | POST | Create delegate bot wallet |
-| `/api/trade/wallet` | GET | Wallet identity + balance |
-| `/api/trade/approve` | POST | Approve AVE spender for token |
-| `/api/trade/swap` | POST | Market swap (buy/sell) |
-| `/api/trade/orders` | GET | Order status query |
+This is the current production-shaped path today.
 
-### 5.3 Wallet Onboarding States
+### 5.2 V4 Target (not yet launched)
 
-| State | Condition | UI behavior |
-|-------|-----------|-------------|
-| `no_wallet` | No `assetsId` in localStorage | Show wallet creation prompt |
-| `wallet_empty` | `assetsId` exists, zero balance | Show deposit instructions |
-| `wallet_funded` | `assetsId` exists, has BNB/USDT | Enable trade buttons |
+V4 changes credential ownership from platform-level keys to **per-user AVE Bot keys**:
 
-### 5.4 Risk Controls
+1. User enters their own `AVE_BOT_API_KEY` and `AVE_BOT_API_SECRET` on the website.
+2. If the user does not yet have `assetsId`, backend uses that user's key/secret to generate wallet directly.
+3. Backend returns `assetsId + bindingCode + walletAddress` to complete initial binding.
+4. Server encrypts credentials and stores them in SQLite (`trade-credentials.db`), never in plaintext.
+5. Trade requests resolve credentials by user binding, then call AVE Bot API server-side.
+
+This is the intended **V4 per-user key primary flow**.
+
+**Important:** V4 is architecture-defined but not yet declared live.
+- **Status gate:** `V4-A core` semantics are in place, but Agent1/Agent2 integration and production acceptance are still pending.
+
+### 5.3 Binding Model (V4 design)
+
+| Binding field | Source | Purpose |
+|---------------|--------|---------|
+| `assetsId` | AVE delegate wallet lifecycle | Bind wallet/trade configuration to the user scope |
+| `bindingCode` (小龙虾 ID) | Website <-> skill handshake | Bind skill identity to the same user credential scope |
+| `walletAddress` | Backend wallet generation response | Return the generated wallet address for user confirmation and deposit UX |
+| SQLite credential row | Server runtime storage | Store encrypted `AVE_BOT_API_KEY` / `AVE_BOT_API_SECRET` plus metadata |
+
+Design intent:
+- `assetsId` is the trade-config binding anchor.
+- `bindingCode` (小龙虾 ID) is the skill-binding anchor.
+- Both must resolve to the same user scope before any approve/swap action.
+
+### 5.4 Runtime SQLite and Encryption (V4 design)
+
+- SQLite file path (repo/runtime): `apps/web/.runtime/trade-credentials.db`
+- Container path: `/app/apps/web/.runtime/trade-credentials.db`
+- VPS host path (with current compose mount): `/opt/meme-affinity/runtime/trade-credentials.db`
+- Encryption master key env: `USER_CREDENTIALS_MASTER_KEY` (**required in production for V4**)
+
+Failure mode (required by design):
+- If `USER_CREDENTIALS_MASTER_KEY` is missing or invalid, the service must fail closed for V4 credential read/write paths.
+- V3 existing flow remains independent until migration is completed.
+
+### 5.5 Shared Risk Controls (V3 + V4 direction)
 
 | Control | Implementation |
 |---------|---------------|
@@ -314,16 +343,23 @@ V3 adds real BSC trading via the **AVE Bot Wallet API**. The website server hold
 | Confirmation lock | Skill requires explicit confirmation |
 | Anti-fat-finger | `confirmToken` must match `tokenAddress` |
 | Slippage clamp | 1%–50% (100–5000 bps) |
-| No credential exposure | AVE keys server-side only |
+| No plaintext credential return | Browser/skill never receives raw API secrets |
 | No mnemonic storage | Discarded after generation |
 | No auto-trading | No scheduled/triggered trades |
 
-### 5.5 BSC Token Addresses
+### 5.6 BSC Token Addresses
 
 | Asset | AVE address |
 |-------|-------------|
 | BNB (native) | `0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee` |
 | USDT on BSC | `0x55d398326f99059ff775485246999027b3197955` |
+
+### 5.7 Migration Guardrails (V4)
+
+- Per-user key mode is not acceptance-complete.
+- Any temporary global env credential fallback (`AVE_BOT_API_KEY` / `AVE_BOT_API_SECRET`) is migration-only compatibility behavior.
+- Global env fallback must not be treated as final V4 architecture.
+- `wallet/generate` remains available for V3 legacy operations, but is not the V4 primary workflow.
 
 ---
 
@@ -383,6 +419,10 @@ V3 adds real BSC trading via the **AVE Bot Wallet API**. The website server hold
 ### 6.3 Trade Endpoints
 
 See `docs/V3_TRADING_CONTRACT.md` for the full contract.
+
+Path note:
+- `/api/trade/wallet/generate` is documented as V3 legacy path.
+- V4 primary bootstrap is per-user key flow: no `assetsId` -> backend generates wallet with user key -> return `assetsId + bindingCode + walletAddress` (still pending full acceptance).
 
 ---
 
@@ -465,6 +505,9 @@ All runtime files live in `apps/web/.runtime/` (Docker: bind-mounted from `/opt/
 |------|---------|-----|
 | `ave-metrics.json` | Cumulative AVE API call counter | Permanent |
 | `smartmoney-snapshot.json` | 24h smart-wallet list cache | 5 minutes |
+| `trade-credentials.db` | V4 encrypted per-user AVE Bot credentials (SQLite) | Permanent |
+
+For V4 rollout, `trade-credentials.db` persistence is mandatory across container restarts and image rebuilds.
 
 ### 8.2 In-Memory Caches
 
@@ -487,36 +530,38 @@ All runtime files live in `apps/web/.runtime/` (Docker: bind-mounted from `/opt/
 
 ### 9.2 Environment Variables
 
-#### Required
+#### Required Core
 
 ```
-AVE_API_KEY            # AVE data API key (token detail, risk, holders, smart wallets, address tx)
+AVE_API_KEY                 # AVE data API key (token detail, risk, holders, smart wallets, address tx)
+MINIMAX_API_KEY             # MiniMax API key (or ANTHROPIC_API_KEY alias)
+PUBLIC_BASE_URL             # Public URL for self-referencing API calls
 ```
 
-#### MiniMax (required for AI scoring)
+#### Trading Credentials Mode
 
 ```
-MINIMAX_API_KEY        # MiniMax API key (or ANTHROPIC_API_KEY alias)
+# V3 current mode (already implemented, platform-level credentials)
+AVE_BOT_API_KEY             # AVE Bot API key used by server for V3 trading
+AVE_BOT_API_SECRET          # AVE Bot API secret used by server for V3 trading
+
+# V4 target mode (per-user credentials, encrypted in SQLite)
+USER_CREDENTIALS_MASTER_KEY # REQUIRED in production to encrypt/decrypt user credentials
 ```
 
-#### Optional
+#### Optional / Tunables
 
 ```
-MINIMAX_BASE_URL       # Default: https://api.minimaxi.com/anthropic
-MINIMAX_API_STYLE      # "anthropic" (default) or "openai"
-MINIMAX_MODEL          # Default: MiniMax-M2.7
-MINIMAX_PLAN           # "token" (default) or "coding"
-MINIMAX_TIMEOUT_MS     # Default: 16000 (ms)
-MINIMAX_API_HOST       # Override API host
+MINIMAX_BASE_URL            # Default: https://api.minimaxi.com/anthropic
+MINIMAX_API_STYLE           # "anthropic" (default) or "openai"
+MINIMAX_MODEL               # Default: MiniMax-M2.7
+MINIMAX_PLAN                # "token" (default) or "coding"
+MINIMAX_TIMEOUT_MS          # Default: 16000 (ms)
+MINIMAX_API_HOST            # Override API host
 
-AVE_DATA_BASE_URL      # Default: https://prod.ave-api.com
-AVE_REQUEST_TIMEOUT_MS # Default: 10000 (ms)
-
-AVE_BOT_API_KEY        # AVE Bot API key (for V3 trading)
-AVE_BOT_API_SECRET     # AVE Bot API secret (HMAC)
-AVE_BOT_BASE_URL       # Default: https://bot-api.ave.ai
-
-PUBLIC_BASE_URL        # Public URL for self-referencing API calls
+AVE_DATA_BASE_URL           # Default: https://prod.ave-api.com
+AVE_REQUEST_TIMEOUT_MS      # Default: 10000 (ms)
+AVE_BOT_BASE_URL            # Default: https://bot-api.ave.ai
 ```
 
 ---
@@ -589,6 +634,6 @@ These are explicitly excluded from the current mainline:
 - Limit orders
 - Auto-sell / stop-loss / trailing stop
 - Strategy engine or scheduled trades
-- Database
+- External business database (Postgres/MySQL) as a primary app store
 - Admin panel
 - Multiple public personas (only CZ)

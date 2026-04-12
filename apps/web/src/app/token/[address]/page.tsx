@@ -148,7 +148,7 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
   if (!data) {
     return (
       <main className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col px-6 py-6 md:px-10 md:py-8">
-        <SiteNav current="token" ctaHref="/tech" ctaLabel="打开技术说明" />
+        <SiteNav current="token" ctaHref="/tech" ctaLabel="打开技术说明" showTechLink={false} />
 
         <section className="surface-card-strong poster-enter px-6 py-8 md:px-8 md:py-10">
           <p className="section-kicker text-[var(--color-accent)]">暂时拿不到 live 报告</p>
@@ -200,7 +200,7 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
 
   return (
     <main className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 py-6 md:px-10 md:py-8">
-      <SiteNav current="token" ctaHref="/tech" ctaLabel="打开技术说明" />
+      <SiteNav current="token" ctaHref="/tech" ctaLabel="打开技术说明" showTechLink={false} />
 
       <section className="surface-card-strong poster-enter relative overflow-hidden px-6 py-7 md:px-8 md:py-8">
         <div className="pointer-events-none absolute -right-16 top-6 hidden h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(241,199,106,0.24)_0%,transparent_72%)] blur-3xl lg:block" />
@@ -354,79 +354,32 @@ export default async function TokenDetailsPage({ params }: TokenPageProps) {
 
       <section className="mt-6">
         <article className="surface-card reveal-up px-6 py-7 md:px-7">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="section-kicker">聪明钱爱吗</p>
-              <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
-                聪明钱
-              </h2>
-            </div>
-            <LevelBadge
-              label={formatDisplayLevel(data.smartMoney.displayLevel)}
-              emoji={data.smartMoney.displayEmoji}
-              tone={getDisplayTone(data.smartMoney.displayLevel)}
-            />
-          </div>
+          <p className="section-kicker">聪明钱爱吗</p>
+          <h2 className="display-copy mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
+            聪明钱
+          </h2>
 
-          <div className="mt-6 rounded-[28px] border border-white/10 bg-[var(--color-panel-strong)] p-5">
-            <div className="grid gap-4 lg:grid-cols-[0.45fr_0.55fr]">
-              <div>
-                <p className="text-5xl font-semibold text-[var(--color-ink)]">
-                  {data.smartMoney.matchedCount}
-                </p>
-                <p className="mt-2 text-sm uppercase tracking-[0.24em] text-[var(--color-muted)]">
-                  命中钱包数
-                </p>
-                <p className="mt-4 text-sm leading-7 text-[var(--color-ink-soft)]">
-                  {data.smartMoney.summary}
-                </p>
-              </div>
-
-              <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">evidence</p>
-                <div className="mt-4 space-y-3">
-                  {data.smartMoney.evidence.map((item, index) => (
-                    <div
-                      key={`smartmoney-evidence-${index}`}
-                      className="rounded-[16px] border border-white/10 bg-white/5 px-3 py-3 text-sm leading-6 text-[var(--color-ink-soft)]"
-                    >
-                      {item}
-                    </div>
-                  ))}
+          {data.smartMoney.matches.length ? (
+            <div className="mt-6 grid gap-2">
+              {data.smartMoney.matches.slice(0, 4).map((match, index) => (
+                <div
+                  key={`${match.address}-${index}`}
+                  className="flex items-center justify-between gap-3 rounded-[14px] border border-white/8 bg-white/[0.03] px-4 py-2.5"
+                >
+                  <span className="font-mono text-sm text-[var(--color-ink)]">
+                    {formatAddress(match.address)}
+                  </span>
+                  <span className="text-xs text-[var(--color-ink-soft)]">
+                    {formatPercentage(match.percentage)}
+                  </span>
                 </div>
-              </div>
+              ))}
             </div>
-
-            {data.smartMoney.matches.length ? (
-              <div className="mt-5 grid gap-3">
-                {data.smartMoney.matches.slice(0, 4).map((match, index) => (
-                  <div
-                    key={`${match.address}-${index}`}
-                    className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="font-mono text-sm text-[var(--color-ink)]">
-                        {formatAddress(match.address)}
-                      </span>
-                      <div className="flex flex-wrap gap-2 text-xs text-[var(--color-ink-soft)]">
-                        <span className="rounded-full border border-white/10 px-2 py-1">
-                          rank {match.rank ?? "n/a"}
-                        </span>
-                        <span className="rounded-full border border-white/10 px-2 py-1">
-                          {formatPercentage(match.percentage)}
-                        </span>
-                        {match.tag ? (
-                          <span className="rounded-full border border-cyan-300/20 px-2 py-1 text-cyan-100">
-                            {match.tag}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
+          ) : (
+            <p className="mt-6 text-sm text-[var(--color-muted)]">
+              暂无命中钱包
+            </p>
+          )}
         </article>
       </section>
 

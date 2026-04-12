@@ -7,6 +7,7 @@ import type {
   SwapResponse,
   GetOrdersResponse,
 } from "@meme-affinity/core";
+import { TradeConfigPanel, type TradeConfigState } from "./trade-config-panel";
 
 type TradePanelProps = {
   tokenAddress: string;
@@ -45,8 +46,11 @@ function formatOrderStatus(status: string) {
 
 export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelProps) {
   const [assetsId, setAssetsId] = useState<string | null>(null);
+  const [bindingCode, setBindingCode] = useState<string | null>(null);
   const [wallet, setWallet] = useState<GetWalletResponse | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingState>("no_wallet");
+  const [tradeConfigState, setTradeConfigState] =
+    useState<TradeConfigState>("trade_config_missing");
   const [loading, setLoading] = useState(false);
 
   // Form state
@@ -61,21 +65,75 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
   const [orderStatus, setOrderStatus] = useState<GetOrdersResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load assetsId from localStorage on mount
+  const preferredIdentity =
+    bindingCode?.trim() ? { bindingCode: bindingCode.trim() } : assetsId?.trim() ? { assetsId: assetsId.trim() } : null;
+
+  const isTradeConfigReady = tradeConfigState === "trade_config_ready";
+  const tradeConfigBlockedMessage =
+    tradeConfigState === "trade_config_missing"
+      ? "请先配置你自己的 AVE Bot API（Key / Secret），再执行授权和买卖。"
+      : tradeConfigState === "trade_config_invalid"
+        ? "当前交易 API 配置无效，请更新后再执行授权和买卖。"
+        : null;
+  const tradeConfigBlockedClassName =
+    tradeConfigState === "trade_config_invalid"
+      ? "mt-3 rounded-[16px] border border-rose-300/20 bg-rose-300/8 px-4 py-3 text-sm text-rose-50"
+      : "mt-3 rounded-[16px] border border-amber-300/20 bg-amber-300/8 px-4 py-3 text-sm text-amber-50";
+  const tradeDisabledReason =
+    onboarding !== "wallet_funded"
+      ? "请先完成入金"
+      : tradeConfigState === "trade_config_missing"
+        ? "请先配置个人交易 API"
+      : tradeConfigState === "trade_config_invalid"
+          ? "交易 API 配置无效，请更新"
+          : undefined;
+
+  // Load identity from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("ave_assets_id");
-      if (stored) {
-        setAssetsId(stored);
+      const storedAssetsId = localStorage.getItem("ave_assets_id");
+      if (storedAssetsId) {
+        setAssetsId(storedAssetsId);
+      }
+      const storedBindingCode = localStorage.getItem("ave_binding_code");
+      if (storedBindingCode) {
+        setBindingCode(storedBindingCode);
       }
     } catch {
       // localStorage unavailable
     }
   }, []);
 
-  // Fetch wallet info when assetsId changes
-  const refreshWallet = useCallback(async () => {
-    if (!assetsId) {
+  const persistIdentity = useCallback((next: { assetsId?: string | null; bindingCode?: string | null }) => {
+    if (next.assetsId !== undefined) {
+      setAssetsId(next.assetsId);
+      try {
+        if (next.assetsId) {
+          localStorage.setItem("ave_assets_id", next.assetsId);
+        } else {
+          localStorage.removeItem("ave_assets_id");
+        }
+      } catch {}
+    }
+
+    if (next.bindingCode !== undefined) {
+      setBindingCode(next.bindingCode);
+      try {
+        if (next.bindingCode) {
+          localStorage.setItem("ave_binding_code", next.bindingCode);
+        } else {
+          localStorage.removeItem("ave_binding_code");
+        }
+      } catch {}
+    }
+  }, []);
+
+  // Fetch wallet info when identity changes
+  const refreshWallet = useCallback(async (override?: { assetsId?: string | null; bindingCode?: string | null }) => {
+    const targetBindingCode = (override?.bindingCode ?? bindingCode)?.trim() || "";
+    const targetAssetsId = (override?.assetsId ?? assetsId)?.trim() || "";
+
+    if (!targetBindingCode && !targetAssetsId) {
       setOnboarding("no_wallet");
       setWallet(null);
       return;
@@ -83,14 +141,13 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/trade/wallet?assetsId=${encodeURIComponent(assetsId)}`);
+      const query = targetBindingCode
+        ? `bindingCode=${encodeURIComponent(targetBindingCode)}`
+        : `assetsId=${encodeURIComponent(targetAssetsId)}`;
+      const res = await fetch(`/api/trade/wallet?${query}`);
       if (!res.ok) {
         if (res.status === 404) {
           setOnboarding("no_wallet");
-          setAssetsId(null);
-          try {
-            localStorage.removeItem("ave_assets_id");
-          } catch {}
         }
         setWallet(null);
         return;
@@ -98,13 +155,16 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       const data: GetWalletResponse = await res.json();
       setWallet(data);
       setOnboarding(data.balanceState === "funded" ? "wallet_funded" : "wallet_empty");
+      if (data.assetsId && data.assetsId !== assetsId) {
+        persistIdentity({ assetsId: data.assetsId });
+      }
     } catch {
       setOnboarding("no_wallet");
       setWallet(null);
     } finally {
       setLoading(false);
     }
-  }, [assetsId]);
+  }, [assetsId, bindingCode, persistIdentity]);
 
   useEffect(() => {
     refreshWallet();
@@ -122,10 +182,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       }
       const data = await res.json();
       const newAssetsId = data.assetsId as string;
-      setAssetsId(newAssetsId);
-      try {
-        localStorage.setItem("ave_assets_id", newAssetsId);
-      } catch {}
+      persistIdentity({ assetsId: newAssetsId, bindingCode: null });
     } catch {
       setError("创建钱包时网络异常");
     } finally {
@@ -133,8 +190,55 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
     }
   }
 
+  const handleTradeIdentityUpdate = useCallback(
+    (next: {
+      assetsId?: string | null;
+      bindingCode?: string | null;
+      walletAddress?: string | null;
+    }) => {
+      if (next.assetsId !== undefined || next.bindingCode !== undefined) {
+        persistIdentity({
+          assetsId: next.assetsId,
+          bindingCode: next.bindingCode,
+        });
+      }
+
+      if (next.walletAddress) {
+        const resolvedAssetsId = next.assetsId || assetsId || "";
+        setWallet((prev) => {
+          if (prev) return prev;
+          return {
+            assetsId: resolvedAssetsId,
+            address: next.walletAddress as string,
+            chain: "bsc",
+            status: "enabled",
+            type: "self",
+            balanceState: "empty",
+            balances: [],
+          };
+        });
+        if (onboarding === "no_wallet") {
+          setOnboarding("wallet_empty");
+        }
+      }
+
+      const refreshTarget = {
+        assetsId: next.assetsId !== undefined ? next.assetsId : assetsId,
+        bindingCode: next.bindingCode !== undefined ? next.bindingCode : bindingCode,
+      };
+      if (refreshTarget.assetsId || refreshTarget.bindingCode) {
+        void refreshWallet(refreshTarget);
+      }
+    },
+    [assetsId, bindingCode, onboarding, persistIdentity, refreshWallet]
+  );
+
   async function handleApprove() {
-    if (!assetsId) return;
+    if (!preferredIdentity) return;
+    if (!isTradeConfigReady) {
+      setError("请先配置有效的个人 AVE Bot API");
+      return;
+    }
     setLoading(true);
     setError(null);
     setApproveResult(null);
@@ -142,7 +246,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       const res = await fetch("/api/trade/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assetsId, tokenAddress }),
+        body: JSON.stringify({ ...preferredIdentity, tokenAddress }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -158,7 +262,11 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
   }
 
   async function handleSwap() {
-    if (!assetsId) return;
+    if (!preferredIdentity) return;
+    if (!isTradeConfigReady) {
+      setError("请先配置有效的个人 AVE Bot API");
+      return;
+    }
     setLoading(true);
     setError(null);
     setSwapResult(null);
@@ -171,7 +279,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          assetsId,
+          ...preferredIdentity,
           tokenAddress,
           side,
           amount: rawAmount,
@@ -199,7 +307,12 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
 
   async function queryOrderStatus(orderId: string) {
     try {
-      const res = await fetch(`/api/trade/orders?ids=${encodeURIComponent(orderId)}`);
+      const identityQuery = bindingCode?.trim()
+        ? `&bindingCode=${encodeURIComponent(bindingCode.trim())}`
+        : assetsId?.trim()
+          ? `&assetsId=${encodeURIComponent(assetsId.trim())}`
+          : "";
+      const res = await fetch(`/api/trade/orders?ids=${encodeURIComponent(orderId)}${identityQuery}`);
       if (res.ok) {
         const data: GetOrdersResponse = await res.json();
         setOrderStatus(data);
@@ -230,7 +343,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
         {onboarding === "no_wallet" && !loading && (
           <div className="mt-4">
             <p className="text-sm text-[var(--color-ink-soft)]">
-              先创建钱包，再进行授权与买卖。钱包创建后只会在本地保存 `assetsId`。
+              请先在下方填写你的 AVE API。若没有 assetsId，系统会自动创建并绑定钱包，并返回小龙虾 ID（bindingCode）。钱包身份会本地保存 `assetsId` 与 `bindingCode`。
             </p>
             <button
               onClick={handleGenerateWallet}
@@ -255,7 +368,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
               </p>
             </div>
             <button
-              onClick={refreshWallet}
+              onClick={() => void refreshWallet()}
               className="mt-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-[var(--color-ink)] transition hover:border-white/18 hover:bg-white/10"
             >
               刷新余额
@@ -284,7 +397,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
               </div>
             )}
             <button
-              onClick={refreshWallet}
+              onClick={() => void refreshWallet()}
               className="mt-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-[var(--color-ink)] transition hover:border-white/18 hover:bg-white/10"
             >
               刷新余额
@@ -297,16 +410,28 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
         )}
       </div>
 
+      <TradeConfigPanel
+        assetsId={assetsId}
+        bindingCode={bindingCode}
+        onStateChange={setTradeConfigState}
+        onIdentityUpdate={handleTradeIdentityUpdate}
+      />
+
       {/* Approve Section */}
       <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
         <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">✅ 授权</p>
         <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
           卖出前请先授权当前代币给 AVE 合约。
         </p>
+        {tradeConfigBlockedMessage && (
+          <div className={tradeConfigBlockedClassName}>
+            {tradeConfigBlockedMessage}
+          </div>
+        )}
         <button
           onClick={handleApprove}
-          disabled={loading || onboarding !== "wallet_funded"}
-          title={onboarding !== "wallet_funded" ? "请先完成入金" : undefined}
+          disabled={loading || onboarding !== "wallet_funded" || !isTradeConfigReady}
+          title={tradeDisabledReason}
           className="mt-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-[var(--color-ink)] transition hover:border-white/18 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? "处理中..." : "授权代币"}
@@ -325,6 +450,11 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
         <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">↔ 买卖</p>
         <p className="mt-2 text-sm text-[var(--color-ink-soft)]">每次操作都需要手动确认，不会自动下单。</p>
+        {tradeConfigBlockedMessage && (
+          <div className={tradeConfigBlockedClassName}>
+            {tradeConfigBlockedMessage}
+          </div>
+        )}
 
         <div className="mt-4 grid gap-3">
           {/* Side toggle */}
@@ -400,10 +530,11 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
           disabled={
             loading ||
             onboarding !== "wallet_funded" ||
+            !isTradeConfigReady ||
             !amount ||
             Number(amount) <= 0
           }
-          title={onboarding !== "wallet_funded" ? "请先完成入金" : undefined}
+          title={tradeDisabledReason}
           className="mt-4 w-full rounded-full bg-[linear-gradient(135deg,#f4c76a_0%,#ff9b62_100%)] px-5 py-3 text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_18px_40px_rgba(244,199,106,0.24)] transition hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {loading ? "处理中..." : side === "buy" ? "确认买入" : "确认卖出"}

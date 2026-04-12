@@ -7,7 +7,7 @@ export const revalidate = 3600;
 function getAveMetricsSnapshot() {
   try {
     const recorder = createMetricsRecorder();
-    return recorder.getSnapshot();
+    return recorder.getMetrics();
   } catch {
     return null;
   }

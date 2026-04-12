@@ -273,3 +273,66 @@ export interface OrderStatus {
 export interface GetOrdersResponse {
   orders: OrderStatus[];
 }
+
+// V4 Trade credential config types
+
+export type CredentialStatus = "active" | "disabled";
+
+export interface TradeCredentialConfig {
+  assetsId: string;
+  bindingCode: string;
+  encryptedApiKey: string;
+  encryptedApiSecret: string;
+  baseUrl: string;
+  status: CredentialStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTradeConfigRequest {
+  assetsId?: string;
+  apiKey: string;
+  apiSecret: string;
+  baseUrl?: string;
+}
+
+export interface CreateTradeConfigResponse {
+  assetsId: string;
+  bindingCode: string;
+  maskedApiKey: string;
+  walletAddress?: string;
+  status: CredentialStatus;
+  updatedAt: string;
+}
+
+export interface GetTradeConfigResponse {
+  assetsId: string;
+  bindingCode: string;
+  hasConfig: boolean;
+  maskedApiKey: string;
+  status: CredentialStatus;
+  updatedAt: string;
+}
+
+export interface DeleteTradeConfigResponse {
+  success: boolean;
+  assetsId: string;
+}
+
+export interface BindTradeConfigRequest {
+  bindingCode: string;
+}
+
+export interface BindTradeConfigResponse {
+  assetsId: string;
+  status: CredentialStatus;
+}
+
+/** Extended request types with optional bindingCode support */
+export interface ApproveRequestV4 extends ApproveRequest {
+  bindingCode?: string;
+}
+
+export interface SwapRequestV4 extends SwapRequest {
+  bindingCode?: string;
+}
