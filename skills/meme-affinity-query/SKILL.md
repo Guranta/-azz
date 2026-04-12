@@ -1,10 +1,15 @@
 ---
 name: meme-affinity-query
+installUrl: skills/meme-affinity-query
 description: |
-  Public OpenClaw skill for BSC meme token analysis and trading.
-  Supports five instructions: analyze, bind, approve, buy, sell.
-  All heavy logic stays on the website side.
-  Trade instructions require explicit user confirmation.
+  BSC meme token analysis and trading skill.
+  Five instructions: analyze, bind, approve, buy, sell.
+  Website-side binding required before trading; no secrets held in skill.
+tags:
+  - bsc
+  - meme
+  - trading
+  - openclaw
 ---
 
 # Meme Affinity Query
@@ -23,20 +28,11 @@ Public OpenClaw skill for the project.
 
 This skill stays thin.
 
-- Do not run AVE logic inside the skill
-- Do not run DeepSeek or MiniMax logic inside the skill
-- Do not perform local persona/address scoring
-- Do not call `bot-api.ave.ai` directly
-- Do not hold AVE credentials or any other secrets
-- Treat website API as the only source of truth
-- Per-user key mode depends on website-side binding/config already being valid
-- Keep `analyze` independent from binding state
-- Skill-facing identity fields are only:
-  - `bindingCode`
-  - `小龙虾 ID` (same value as `bindingCode`, user-facing alias)
-- `bindingCode` / `小龙虾 ID` is the only external binding entry accepted by the skill
-- Do not ask users to manually input `assetsId` in normal skill flows
-- `assetsId` may exist server-side, but must be treated as internal and should not be required in normal skill commands
+1. `bindingCode` / `小龙虾 ID` is the only external binding entry — no `assetsId` in skill-facing flows
+2. `analyze` does not depend on binding state
+3. `approve` / `buy` / `sell` require binding state (`BOUND`)
+4. Skill only calls website API — never calls AVE/MiniMax/DeepSeek directly
+5. Skill does not hold API keys, secrets, or credentials
 
 ## Supported Instructions
 
@@ -113,17 +109,16 @@ Token analysis. Calls website `/api/score-token`.
 2. Call `POST {websiteBaseUrl}/api/score-token` with `{ tokenAddress, chain: "bsc" }`.
 3. Parse response and render compact summary.
 
-**Analysis output template (compact):**
+**Analysis output template (compact, 6 lines max):**
 
 ```text
 📳 {token.name} ({token.symbol})
 🤤 CZ: {score}/100 ({displayLevel})
 🦥 聪明钱: {matchedCount} matched ({displayLevel})
 🎆 建议: {recommendation}
+⚠️ 风险: {token.risk.riskLevel} ({token.risk.riskScore})
 🔆 {website_url}/token/{address}
 ```
-
-Maximum 5 lines.
 
 ---
 
@@ -148,9 +143,12 @@ Bind OpenClaw skill context to website trade credentials.
 ```text
 ✅ 已绑定
 小龙虾 ID: {bindingCode}
+钱包: {wallet.address}
 状态: 已绑定
 后续可直接使用 approve / buy / sell（无需输入 assetsId）
 ```
+
+If `wallet` is null in the bind response (AVE API temporarily unreachable), omit the 钱包 line.
 
 **Bind failure output (`失败`, invalid binding):**
 
@@ -198,16 +196,41 @@ Bind OpenClaw skill context to website trade credentials.
 如果还没有小龙虾 ID，请先在网站交易配置页完成配置并复制该 ID
 ```
 
-**Shared confirmation gate (`待确认`):**
+**Shared confirmation gate:**
+
+Before any on-chain action, render an operation-specific confirmation prompt.
+If user response is not exact `确认`, cancel immediately and do not call trade API.
+
+**Approve confirmation (`待确认`):**
 
 ```text
 🟡 待确认
-小龙虾 ID: {bindingCode}
-操作: {approve/buy/sell}
-回复“确认”执行，回复“取消”放弃
+操作: approve（授权卖出）
+代币: {tokenAddress}
+回复”确认”执行，回复”取消”放弃
 ```
 
-If user response is not exact `确认`, cancel immediately and do not call trade API.
+**Buy confirmation (`待确认`):**
+
+```text
+🟡 待确认
+操作: buy（买入）
+代币: {tokenAddress}
+数量: {amount} {baseToken}
+滑点: {slippageBps / 100}%
+回复”确认”执行，回复”取消”放弃
+```
+
+**Sell confirmation (`待确认`):**
+
+```text
+🟡 待确认
+操作: sell（卖出）
+代币: {tokenAddress}
+数量: {amount} {baseToken}
+滑点: {slippageBps / 100}%
+回复”确认”执行，回复”取消”放弃
+```
 
 ---
 
@@ -220,8 +243,8 @@ Approve AVE spender for token sell.
 
 **Execution:**
 
-1. Enforce shared trade preconditions.
-2. Ask confirmation.
+1. Enforce shared trade preconditions (binding required).
+2. Render approve confirmation prompt.
 3. If confirmed, call `POST {websiteBaseUrl}/api/trade/approve` with:
    ```json
    {
@@ -271,10 +294,10 @@ Swap BNB/USDT to target token.
 
 **Execution:**
 
-1. Enforce shared trade preconditions.
+1. Enforce shared trade preconditions (binding required).
 2. Validate `amount > 0` and `baseToken` in `bnb|usdt`.
 3. Convert amount to smallest unit string.
-4. Ask confirmation.
+4. Render buy confirmation prompt (showing amount, baseToken, slippage).
 5. If confirmed, call `POST {websiteBaseUrl}/api/trade/swap`:
    ```json
    {
@@ -309,7 +332,8 @@ Swap token to BNB/USDT.
 
 **Execution:**
 
-Same flow as `buy`, but `side: "sell"`.
+1. Same flow as `buy`, but `side: "sell"`.
+2. Render sell confirmation prompt (showing amount, baseToken, slippage).
 
 If API returns `Token not approved yet (sell requires approve first)`, render failure with explicit remediation (`先执行 approve`).
 
@@ -344,6 +368,7 @@ Map website order status to required output labels:
 订单: {orderId}
 状态: confirmed
 {txHash if exists}
+{inAmount → outAmount if both exist}
 ```
 
 **Failed order output (`失败`):**
@@ -389,9 +414,9 @@ If order status is `error`, or swap/approve API fails, return `失败` with sani
 skill input -> parse instruction ->
   if analyze -> call /api/score-token -> return analysis
   if bind -> call /api/trade/bind -> set binding state -> return 已绑定/失败
-  if approve -> require binding -> require explicit confirm -> call /api/trade/approve with bindingCode -> return 成功/失败
-  if buy -> require binding -> require explicit confirm -> call /api/trade/swap(side=buy,bindingCode) -> return 待确认/成功/失败
-  if sell -> require binding -> require explicit confirm -> call /api/trade/swap(side=sell,bindingCode) -> return 待确认/成功/失败
+  if approve -> require binding -> approve确认 -> call /api/trade/approve with bindingCode -> return 成功/失败
+  if buy -> require binding -> buy确认(显示数量/滑点) -> call /api/trade/swap(side=buy,bindingCode) -> return 待确认/成功/失败
+  if sell -> require binding -> sell确认(显示数量/滑点) -> call /api/trade/swap(side=sell,bindingCode) -> return 待确认/成功/失败
 ```
 
 ## Default Base URL

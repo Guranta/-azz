@@ -334,10 +334,10 @@ export function TradeConfigPanel({
             className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-[var(--color-ink)] transition hover:border-white/18 hover:bg-white/10"
           >
             {copyBindingState === "copied"
-              ? "bindingCode 已复制"
+              ? "小龙虾 ID 已复制"
               : copyBindingState === "failed"
                 ? "复制失败，请手动复制"
-                : "复制 bindingCode"}
+                : "复制小龙虾 ID"}
           </button>
         )}
 

@@ -1,5 +1,19 @@
 # BSC Meme Affinity Platform
 
+## OpenClaw Skill 安装
+
+复制以下内容到 OpenClaw：
+
+```text
+repo: https://github.com/Guranta/-azz.git
+path: skills/meme-affinity-query
+skill: meme-affinity-query
+```
+
+可用指令：`analyze` · `bind` · `approve` · `buy` · `sell`
+
+---
+
 BSC meme-token affinity analysis and trading product:
 - Public website for token scoring, address profiling, and BSC trading
 - OpenClaw skill for token analysis and trade instructions
