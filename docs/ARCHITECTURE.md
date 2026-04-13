@@ -1,6 +1,6 @@
 # Architecture Guide
 
-Last updated: 2026-04-12
+Last updated: 2026-04-13
 
 ---
 
@@ -26,7 +26,7 @@ The platform focuses exclusively on BSC meme tokens launched from `fourmeme` and
 | `/tech` | Architecture and scoring explanation | Static page |
 | `POST /api/score-token` | Token scoring API | Token address |
 | `POST /api/score-address` | Address profiling API | Wallet address |
-| `POST /api/trade/*` | 5 trade endpoints | AVE Bot wallet |
+| `POST /api/trade/*` | 6 trade endpoints | Binding code / assetsId |
 
 ---
 
@@ -48,14 +48,15 @@ bsc-meme-affinity-platform/
 │   │   └── api/
 │   │       ├── score-token/route.ts  # V1 token scoring endpoint
 │   │       ├── score-address/route.ts# V2 address profiling endpoint
-│   │       └── trade/                # V3 trade endpoints
-│   │           ├── wallet/generate/  # Create bot wallet
+│   │       └── trade/                # Trade endpoints
+│   │           ├── wallet/generate/  # Create platform-managed wallet
 │   │           ├── wallet/           # Wallet identity + balance
+│   │           ├── bind/             # Bind by bindingCode
 │   │           ├── approve/          # Token approval
 │   │           ├── swap/             # Market swap (buy/sell)
 │   │           └── orders/           # Order status query
 │   ├── src/components/
-│   │   ├── trade-panel.tsx           # V3 trading UI
+│   │   ├── trade-panel.tsx           # Trading UI (wallet + approve + swap)
 │   │   ├── token-search-form.tsx     # Search input component
 │   │   ├── sponsor-surface.tsx       # AVE/MiniMax/BNB sponsor display
 │   │   ├── site-nav.tsx             # Navigation bar
@@ -68,7 +69,9 @@ bsc-meme-affinity-platform/
 │   │   ├── smartmoney-snapshot.ts    # 24h smart-money cache
 │   │   ├── runtime-metrics.ts       # AVE API call counter
 │   │   ├── project-config.ts        # Persona/tracked-address config loader
-│   │   └── ave-bot-client.ts        # AVE Bot API client (HMAC-SHA256)
+│   │   ├── ave-bot-client.ts        # AVE Bot API client (HMAC-SHA256)
+│   │   ├── binding-store.ts         # Wallet binding store (SQLite)
+│   │   └── resolve-trade-credential.ts # Resolve bindingCode → client
 │   ├── scripts/                      # Utility scripts
 │   └── CLAUDE.md / AGENTS.md        # AI contributor guides
 ├── packages/core/                     # Shared logic and types
@@ -119,7 +122,7 @@ bsc-meme-affinity-platform/
 | Package manager | npm | npm workspaces monorepo |
 | AI provider | MiniMax (Anthropic API) | M2.7 model, server-side only |
 | Data provider | AVE API | Token detail, risk, top holders, smart wallets, address tx |
-| Trading | AVE Bot Wallet API | HMAC-SHA256 auth, BSC only |
+| Trading | AVE Bot Wallet API | HMAC-SHA256 auth, BSC only, platform-managed wallets |
 | Deployment | Docker + docker-compose | Standalone Next.js output |
 
 ---
@@ -281,60 +284,113 @@ MINIMAX_MODEL = MiniMax-M2.7
 
 ---
 
-## 5. Trading Architecture (V3 Live, V4 Planned)
+## 5. Trading Architecture
 
-### 5.1 V3 Status (already implemented)
+### 5.1 Platform-Managed Wallet Model
 
-V3 real BSC trading is implemented and available through the **AVE Bot Wallet API**:
+The trading system uses a **platform-managed wallet** model:
 
-- Trade endpoints: `/api/trade/wallet/generate`, `/api/trade/wallet`, `/api/trade/approve`, `/api/trade/swap`, `/api/trade/orders`
-- Wallet binding key in browser: `assetsId` (localStorage)
-- Credential mode: platform-level `AVE_BOT_API_KEY` + `AVE_BOT_API_SECRET` configured on the server
-- `wallet/generate` is retained as the V3 legacy bootstrap path.
+1. The server holds a single `AVE_BOT_API_KEY` + `AVE_BOT_API_SECRET` pair.
+2. Users create wallets through the website (`POST /api/trade/wallet/generate`).
+3. The server generates a delegate wallet via AVE Bot API and creates a binding record.
+4. The server returns `assetsId`, `walletAddress`, and `bindingCode` (绑定码) to the user.
+5. Users deposit BNB/USDT to their wallet address.
+6. All subsequent trade operations (approve, buy, sell) use the binding code or assetsId.
+7. The OpenClaw skill uses `bind <绑定码>` to bind, then operates via binding code only.
 
-This is the current production-shaped path today.
+**Key principle:** Users never provide API keys or secrets. The platform manages everything.
 
-### 5.2 V4 Target (not yet launched)
+### 5.2 Data Model
 
-V4 changes credential ownership from platform-level keys to **per-user AVE Bot keys**:
+Wallet bindings are stored in SQLite:
 
-1. User enters their own `AVE_BOT_API_KEY` and `AVE_BOT_API_SECRET` on the website.
-2. If the user does not yet have `assetsId`, backend uses that user's key/secret to generate wallet directly.
-3. Backend returns `assetsId + bindingCode + walletAddress` to complete initial binding.
-4. Server encrypts credentials and stores them in SQLite (`trade-credentials.db`), never in plaintext.
-5. Trade requests resolve credentials by user binding, then call AVE Bot API server-side.
+| File | Purpose |
+|------|---------|
+| `.runtime/trade-bindings.db` | Wallet binding relationships (assetsId, walletAddress, bindingCode, status, timestamps) |
 
-This is the intended **V4 per-user key primary flow**.
+Schema:
 
-**Important:** V4 is architecture-defined but not yet declared live.
-- **Status gate:** `V4-A core` semantics are in place, but Agent1/Agent2 integration and production acceptance are still pending.
+```sql
+CREATE TABLE wallet_bindings (
+  assets_id        TEXT PRIMARY KEY,
+  wallet_address   TEXT NOT NULL,
+  binding_code     TEXT NOT NULL UNIQUE,
+  status           TEXT NOT NULL DEFAULT 'active',
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL
+);
+```
 
-### 5.3 Binding Model (V4 design)
+### 5.3 API Endpoints
+
+#### `POST /api/trade/wallet/generate`
+
+Primary onboarding path. Creates a platform-managed delegate wallet.
+
+**Request:** (empty body)
+
+**Response (200):**
+
+```typescript
+{
+  assetsId: string;
+  walletAddress: string;  // BSC wallet address
+  chain: "bsc";
+  bindingCode: string;   // 绑定码 for skill binding
+  createdAt: string;
+}
+```
+
+**AVE mapping:** `POST /v1/thirdParty/user/generateWallet`
+
+#### `GET /api/trade/wallet`
+
+Query wallet identity and balance.
+
+**Query params:** `?bindingCode=...` (preferred) or `?assetsId=...`
+
+**Response:** `GetWalletResponse` with `balanceState` and `balances`.
+
+#### `POST /api/trade/bind`
+
+Bind a skill session to a wallet via binding code.
+
+**Request:** `{ bindingCode: string }`
+
+**Response:** `{ assetsId, status, wallet? }`
+
+#### `POST /api/trade/approve`
+
+Approve AVE spender for a token.
+
+**Request:** `{ bindingCode (or assetsId), tokenAddress }`
+
+#### `POST /api/trade/swap`
+
+Submit a market swap order.
+
+**Request:** `{ bindingCode (or assetsId), tokenAddress, side, amount, baseToken, slippageBps, confirmToken }`
+
+#### `GET /api/trade/orders`
+
+Query order status.
+
+**Query params:** `?ids=...&bindingCode=...` (or `assetsId`)
+
+### 5.4 Binding Model
 
 | Binding field | Source | Purpose |
 |---------------|--------|---------|
-| `assetsId` | AVE delegate wallet lifecycle | Bind wallet/trade configuration to the user scope |
-| `bindingCode` (小龙虾 ID) | Website <-> skill handshake | Bind skill identity to the same user credential scope |
-| `walletAddress` | Backend wallet generation response | Return the generated wallet address for user confirmation and deposit UX |
-| SQLite credential row | Server runtime storage | Store encrypted `AVE_BOT_API_KEY` / `AVE_BOT_API_SECRET` plus metadata |
+| `assetsId` | AVE delegate wallet lifecycle | Trade operation anchor |
+| `bindingCode` (绑定码) | Website wallet generation | Skill ↔ website handshake |
+| `walletAddress` | AVE wallet generation response | User deposit target |
 
 Design intent:
 - `assetsId` is the trade-config binding anchor.
-- `bindingCode` (小龙虾 ID) is the skill-binding anchor.
-- Both must resolve to the same user scope before any approve/swap action.
+- `bindingCode` (绑定码) is the skill-binding anchor.
+- Both resolve to the same wallet. Skill only uses `bindingCode`.
 
-### 5.4 Runtime SQLite and Encryption (V4 design)
-
-- SQLite file path (repo/runtime): `apps/web/.runtime/trade-credentials.db`
-- Container path: `/app/apps/web/.runtime/trade-credentials.db`
-- VPS host path (with current compose mount): `/opt/meme-affinity/runtime/trade-credentials.db`
-- Encryption master key env: `USER_CREDENTIALS_MASTER_KEY` (**required in production for V4**)
-
-Failure mode (required by design):
-- If `USER_CREDENTIALS_MASTER_KEY` is missing or invalid, the service must fail closed for V4 credential read/write paths.
-- V3 existing flow remains independent until migration is completed.
-
-### 5.5 Shared Risk Controls (V3 + V4 direction)
+### 5.5 Risk Controls
 
 | Control | Implementation |
 |---------|---------------|
@@ -343,9 +399,9 @@ Failure mode (required by design):
 | Confirmation lock | Skill requires explicit confirmation |
 | Anti-fat-finger | `confirmToken` must match `tokenAddress` |
 | Slippage clamp | 1%–50% (100–5000 bps) |
-| No plaintext credential return | Browser/skill never receives raw API secrets |
 | No mnemonic storage | Discarded after generation |
 | No auto-trading | No scheduled/triggered trades |
+| No user keys | Platform manages all AVE Bot credentials |
 
 ### 5.6 BSC Token Addresses
 
@@ -353,13 +409,6 @@ Failure mode (required by design):
 |-------|-------------|
 | BNB (native) | `0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee` |
 | USDT on BSC | `0x55d398326f99059ff775485246999027b3197955` |
-
-### 5.7 Migration Guardrails (V4)
-
-- Per-user key mode is not acceptance-complete.
-- Any temporary global env credential fallback (`AVE_BOT_API_KEY` / `AVE_BOT_API_SECRET`) is migration-only compatibility behavior.
-- Global env fallback must not be treated as final V4 architecture.
-- `wallet/generate` remains available for V3 legacy operations, but is not the V4 primary workflow.
 
 ---
 
@@ -378,20 +427,6 @@ Failure mode (required by design):
 
 **Response (200):** `ScoreTokenResponse`
 
-```typescript
-{
-  token: TokenBrief;
-  personaScores: PersonaScore[];
-  addressScores: AddressScore[];
-  smartMoney: SmartMoneyScore;
-  recommendation: Recommendation;
-  cache: { hit: boolean; expiresAt: string };
-  errors: string[];
-}
-```
-
-**Error (400):** Invalid address or unsupported chain.
-
 ### 6.2 `POST /api/score-address`
 
 **Request:**
@@ -405,24 +440,9 @@ Failure mode (required by design):
 
 **Response (200):** `ScoreAddressResponse`
 
-```typescript
-{
-  address: { address: string; chain: "bsc" };
-  profile: ScoreAddressProfile;
-  cache: { hit: boolean; expiresAt: string };
-  errors: string[];
-}
-```
-
-**Error (400):** Invalid address or unsupported chain.
-
 ### 6.3 Trade Endpoints
 
-See `docs/V3_TRADING_CONTRACT.md` for the full contract.
-
-Path note:
-- `/api/trade/wallet/generate` is documented as V3 legacy path.
-- V4 primary bootstrap is per-user key flow: no `assetsId` -> backend generates wallet with user key -> return `assetsId + bindingCode + walletAddress` (still pending full acceptance).
+See Section 5.3 for the full trade API reference.
 
 ---
 
@@ -476,21 +496,33 @@ User input: wallet address
         └──► Derive archetype → response
 ```
 
-### 7.3 Smart Address Router
+### 7.3 Wallet Onboarding Flow
 
 ```
-/scan/[query]
-    │
-    ├── isBscAddress? ── No ──► redirect /address/[query]
-    │
-    ├── Yes
-    │   │
-    │   ▼
-    │   AVE probe: fetchTokenBrief
-    │   │
-    │   ├── "token" ──────► redirect /token/[address]
-    │   ├── "not_token" ──► redirect /address/[address]
-    │   └── "uncertain" ──► show both options as links
+User clicks "创建钱包"
+        │
+        ▼
+   POST /api/trade/wallet/generate (server uses platform AVE key)
+        │
+        ├──► AVE: POST /v1/thirdParty/user/generateWallet
+        ├──► Server creates binding record (assetsId + bindingCode)
+        └──► Response: { assetsId, address, bindingCode }
+        │
+        ▼
+   Frontend displays wallet address + 绑定码
+        │
+        ▼
+   User deposits BNB/USDT → refreshes balance
+        │
+        ▼
+   GET /api/trade/wallet?bindingCode=...
+        │
+        ├──► Resolve bindingCode → assetsId
+        ├──► AVE: wallet identity + balance
+        └──► Response: { balanceState: "funded", ... }
+        │
+        ▼
+   Trade enabled (approve / buy / sell)
 ```
 
 ---
@@ -505,9 +537,9 @@ All runtime files live in `apps/web/.runtime/` (Docker: bind-mounted from `/opt/
 |------|---------|-----|
 | `ave-metrics.json` | Cumulative AVE API call counter | Permanent |
 | `smartmoney-snapshot.json` | 24h smart-wallet list cache | 5 minutes |
-| `trade-credentials.db` | V4 encrypted per-user AVE Bot credentials (SQLite) | Permanent |
+| `trade-bindings.db` | Wallet binding relationships (SQLite) | Permanent |
 
-For V4 rollout, `trade-credentials.db` persistence is mandatory across container restarts and image rebuilds.
+`trade-bindings.db` persistence is mandatory across container restarts and image rebuilds.
 
 ### 8.2 In-Memory Caches
 
@@ -538,15 +570,12 @@ MINIMAX_API_KEY             # MiniMax API key (or ANTHROPIC_API_KEY alias)
 PUBLIC_BASE_URL             # Public URL for self-referencing API calls
 ```
 
-#### Trading Credentials Mode
+#### Trading Credentials
 
 ```
-# V3 current mode (already implemented, platform-level credentials)
-AVE_BOT_API_KEY             # AVE Bot API key used by server for V3 trading
-AVE_BOT_API_SECRET          # AVE Bot API secret used by server for V3 trading
-
-# V4 target mode (per-user credentials, encrypted in SQLite)
-USER_CREDENTIALS_MASTER_KEY # REQUIRED in production to encrypt/decrypt user credentials
+AVE_BOT_API_KEY             # AVE Bot API key (platform-level, used for all wallet operations)
+AVE_BOT_API_SECRET          # AVE Bot API secret (platform-level, used for HMAC signatures)
+AVE_BOT_BASE_URL            # Default: https://bot-api.ave.ai (optional)
 ```
 
 #### Optional / Tunables
@@ -561,7 +590,7 @@ MINIMAX_API_HOST            # Override API host
 
 AVE_DATA_BASE_URL           # Default: https://prod.ave-api.com
 AVE_REQUEST_TIMEOUT_MS      # Default: 10000 (ms)
-AVE_BOT_BASE_URL            # Default: https://bot-api.ave.ai
+BINDING_DB_PATH             # Override SQLite binding DB path
 ```
 
 ---
@@ -637,3 +666,4 @@ These are explicitly excluded from the current mainline:
 - External business database (Postgres/MySQL) as a primary app store
 - Admin panel
 - Multiple public personas (only CZ)
+- Per-user API key management

@@ -1,71 +1,38 @@
-import {
-  getCredentialByBindingCode,
-} from "./credential-store";
-import { decrypt } from "./credential-crypto";
-import { createAveBotClient, createAveBotClientFromEnv, AveBotClient } from "./ave-bot-client";
-
-export interface ResolvedCredential {
-  assetsId: string;
-  apiKey: string;
-  apiSecret: string;
-  baseUrl: string;
-}
+import { getBindingByBindingCode, getBindingByAssetsId } from "./binding-store";
+import { createAveBotClientFromEnv, AveBotClient } from "./ave-bot-client";
 
 /**
- * Resolve a per-user credential from the store by bindingCode.
- * Returns null if not found or not active.
- */
-export function resolveCredential(params: {
-  bindingCode: string;
-}): ResolvedCredential | null {
-  const cred = getCredentialByBindingCode(params.bindingCode);
-
-  if (!cred || cred.status !== "active") {
-    return null;
-  }
-
-  return {
-    assetsId: cred.assetsId,
-    apiKey: decrypt(cred.encryptedApiKey),
-    apiSecret: decrypt(cred.encryptedApiSecret),
-    baseUrl: cred.baseUrl,
-  };
-}
-
-/**
- * Build an AveBotClient.
+ * Resolve an AveBotClient and assetsId from a bindingCode or assetsId.
  *
- * V4 path: bindingCode → per-user credential store (no fallback).
- * V3 path: assetsId-only → env-based global client (legacy).
+ * All trade operations use the platform's AVE Bot API key (env vars).
+ * bindingCode / assetsId only identify which wallet to operate on.
  *
- * These two paths are deliberately separate — V4 never falls through to env.
+ * Returns null when the binding is not found or inactive.
+ * Throws AveBotConfigError when AVE_BOT_API_KEY / AVE_BOT_API_SECRET are
+ * missing — callers can distinguish "no binding" from "server misconfigured".
  */
 export function resolveAveBotClient(params: {
   assetsId?: string;
   bindingCode?: string;
-}): { client: AveBotClient; assetsId: string; source: "per-user" | "env" } | null {
-  // V4: bindingCode → per-user only
+}): { client: AveBotClient; assetsId: string } | null {
+  // bindingCode → binding store → assetsId
   if (params.bindingCode) {
-    const resolved = resolveCredential({ bindingCode: params.bindingCode });
-    if (!resolved) {
+    const binding = getBindingByBindingCode(params.bindingCode);
+    if (!binding || binding.status !== "active") {
       return null;
     }
-    const client = createAveBotClient({
-      apiKey: resolved.apiKey,
-      apiSecret: resolved.apiSecret,
-      baseUrl: resolved.baseUrl || undefined,
-    });
-    return { client, assetsId: resolved.assetsId, source: "per-user" };
+    const client = createAveBotClientFromEnv();
+    return { client, assetsId: binding.assetsId };
   }
 
-  // V3: assetsId-only → env fallback (legacy)
+  // assetsId-only → binding store lookup, then env client
   if (params.assetsId) {
-    try {
-      const client = createAveBotClientFromEnv();
-      return { client, assetsId: params.assetsId, source: "env" };
-    } catch {
+    const binding = getBindingByAssetsId(params.assetsId);
+    if (!binding || binding.status !== "active") {
       return null;
     }
+    const client = createAveBotClientFromEnv();
+    return { client, assetsId: params.assetsId };
   }
 
   return null;

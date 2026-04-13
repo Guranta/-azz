@@ -1,6 +1,6 @@
 # Task Tracker
 
-Last updated: 2026-04-12
+Last updated: 2026-04-13
 
 Use this file as the single progress board when work is split across multiple AI windows.
 
@@ -44,32 +44,18 @@ Use this file as the single progress board when work is split across multiple AI
 | G1 | Deployment prep (gitignore, Dockerfile, compose, docs) | Another Codex | g1-window | done | C11 | deployment materials ready for VPS |
 | G4 | Repo cleanup and source-of-truth sync | Another Codex | g4-window | done | C12 | temp files removed, docs synced for Hermes redeploy |
 | O7 | Production-facing copy and skill validation | Another Codex | o7-window | done | G4 | homepage/address copy aligned to Chinese, skill 4-instruction validation passed |
-| C13 | Frozen driver system switch + tech page update | Claude Code | main | done | G4 | tracked-address scoring switched to frozen driver system; tech page updated to Chinese with system notes; address page enhanced with summary+evidence |
-| D1 | Full documentation rewrite | Claude Code | main | done | C13 | ARCHITECTURE.md, RUNBOOK.md, updated PROJECT_HANDOFF.md and TASK_TRACKER.md |
-| V4-A | Per-user AVE key vault (website input -> encrypted SQLite persistence) | V4 Agent 1 | v4-a-window | review | C11 | core semantics in place (`no assetsId` -> generate wallet -> return `assetsId + bindingCode + walletAddress`); integration/acceptance pending |
-| V4-B | Binding model integration (`assetsId` + `bindingCode` / 小龙虾 ID) | V4 Agent 2 | v4-b-window | in_progress | V4-A | skill-user binding and trade-config ownership checks |
-| V4-C | Ops/deploy handoff for runtime DB persistence, backup/restore, rollback | V4 Agent 3 | v4-c-window | in_progress | V4-A, V4-B | V4 architecture/runbook/handoff/tracker alignment; fallback not final-arch; V3 legacy path boundaries documented |
-| T10 | VPS deployment | — | — | todo | D1 | deployed site + ops docs |
-| T11 | Final integration and maintenance docs | — | — | done | D1 | architecture guide, operations runbook, updated handoff |
+| C13 | Frozen driver system switch + tech page update | Claude Code | main | done | G4 | tracked-address scoring switched to frozen driver system |
+| D1 | Full documentation rewrite | Claude Code | main | done | C13 | comprehensive architecture guide and runbook |
+| V4-W | V4 wallet-binding refactor (platform-managed wallets + binding codes) | Claude Code | main | done | C11, D1 | per-user key system removed; platform-managed wallet model with binding codes; binding-store.ts replaces credential-store.ts; trade-bindings.db replaces trade-credentials.db; all docs updated |
+| T10 | VPS deployment | — | — | todo | V4-W | deployed site + ops docs |
 
 ## Current Recommended Assignment
 
 ### Main Codex
 
-- Own review, acceptance, feasibility checks, and final go/no-go on `C10`, `T10`, and `T11`
+- Own review, acceptance, feasibility checks, and final go/no-go on `T10`
 - Do not execute worker feature tasks directly
 - Keep final integration authority on deployment, live wiring, security review, and maintenance docs
-
-### OpenCode
-
-- `O4` is complete
-- Hold for follow-up public skill polish only if deployment or live demo feedback requires it
-- `O5` docs-only cleanup remains non-blocking and off the deployment critical path
-
-### Second Codex Window
-
-- `O6` is complete
-- `T10` and `T11` should follow the updated C10 pure-profile handoff notes
 
 ## Update Rules
 
@@ -96,44 +82,32 @@ Whenever a task changes state:
 - 2026-04-08: `T5` reviewed and accepted after main-line interface cleanup. Marked done.
 - 2026-04-08: `T7` started by main Codex.
 - 2026-04-09: `T7` completed by main Codex. `POST /api/score-token` now uses live AVE token lookup, heuristic CZ scoring, deterministic tracked-address scoring, cache, and partial-failure handling.
-- 2026-04-10: V1 work was re-split into `O1`, `C1`, `O2`, and `C2`. Main Codex now only coordinates, reviews, and accepts worker output before `T10` deployment.
-- 2026-04-10: Latest AVE public docs confirmed `GET /v2/address/tx` and `GET /v2/address/smart_wallet/list`. Old standalone `T6` was merged into `C1`.
-- 2026-04-10: V1 worker packets were refreshed around `address/tx`, `smart_wallet/list`, `top100 holders`, MiniMax server-side scoring, and `4 + N` / `3 + N` API-call accounting.
+- 2026-04-10: V1 work was re-split into `O1`, `C1`, `O2`, and `C2`.
 - 2026-04-10: `O1` reviewed and accepted. Internal fixed-address contract now covers `address/tx`, token narrative bundle, top100 whale interpretation, and smartmoney interpretation.
-- 2026-04-10: `C1` reviewed and moved to revision. Required fixes: pass `token_address` into `address/tx`, use MiniMax for final fixed-address scoring, and align MiniMax provider with the agreed Token/Coding Plan path.
-- 2026-04-10: `C1` revision reviewed and accepted. Live scoring contract now includes smartmoney, recommendation, token-scoped tracked-address history, and server-side MiniMax support.
-- 2026-04-10: `O2` reviewed and accepted. Public OpenClaw skill output now includes token name, token narratives, persona score, smartmoney score, fixed-address score, whale state, and result link.
-- 2026-04-10: `C2` reviewed and accepted. Homepage, `/tech`, sponsor surface, and live result page are in place; earlier emoji concerns were confirmed to be PowerShell display artifacts rather than broken source encoding.
-- 2026-04-10: `O3` reviewed and accepted. Fixed-address capability docs and `smartmoney-daily` snapshot contract now cover the three locked tracked addresses and 24h smartmoney snapshot consumption.
-- 2026-04-10: `C3` reviewed and accepted. Local live website path now uses the real tracked-address config, runtime AVE metrics, and enriched 24h smartmoney snapshot support.
-- 2026-04-10: Next execution split locked to `O4 -> C4 -> T10 -> T11`. Main Codex remains review-only.
-- 2026-04-10: `C4` worker pass completed and moved to review. Local smoke tests ran against live keys (valid fourmeme token, valid flap token, invalid address), runtime metrics and snapshot persistence verified, and website copy/polish checks closed.
-- 2026-04-10: `O4` reviewed and accepted. Public OpenClaw skill output now matches the live website contract and final emoji/text presentation.
-- 2026-04-10: `C4` reviewed and accepted. Local smoke closure passed, runtime `.runtime` persistence was verified, and the project is ready to move into `T10` deployment planning.
-- 2026-04-10: `C5` reviewed and accepted. MiniMax defaults now align with the Anthropic-compatible MiniMax route, alias env vars are supported, and thinking-only responses are classified as incomplete before fallback.
-- 2026-04-10: Local live validation confirmed the API path is healthy, but current demo samples still produce weak product output (`launchpad` unknown, sparse narratives, smartmoney miss, and CZ fallback on tested tokens).
-- 2026-04-10: Deploy priority was intentionally lowered. Next execution split is now `C6 -> T10 -> T11`, with `C6` focused on stronger demo token selection and final local score-quality closure.
-- 2026-04-10: `C6` completed by another Codex. A 6-token local matrix was run across likely fourmeme, likely flap, and smartmoney-leaning samples; recommended demo tokens are `0xb2acf3ae051c7f0b0b8de90cbb4ed99312574444`, `0x924fa68a0fc644485b8df8abfa0a41c2e7744444`, and `0xeccbb861c0dda7efd964010085488b69317e4444`.
-- 2026-04-10: `C6` concluded that fixed-address weakness was primarily history/filter-driven in the local web path. `apps/web/src/lib/score-token.ts` now reads AVE `address/tx` directly for live scoring, restoring token-scoped tracked-address histories without changing the public API contract.
-- 2026-04-10: `C6` log review showed current CZ fallback is dominated by `invalid_json` and `timeout`, not primarily `thinking_only` / incomplete responses, so no MiniMax provider tuning was applied under the task guardrails.
-- 2026-04-10: `C8` completed by another Codex. Added `POST /api/score-address`, `/address/[address]`, homepage Token/Address mode switching, shared address-profile types, deterministic fallback handling, and MiniMax-backed address-profile refinement that falls back cleanly on failure.
-- 2026-04-10: `C8` local validation passed with one active wallet (`0x2a1c7bc7e697f6bff5ae9122c5b0212fe5ac42aa`), one no-history wallet (`0x9f3b63f0d4e9c8a7b6f5e4d3c2b1a09876543210`), one invalid wallet (`0x123`), plus fresh `npm run build` and `npm run lint`.
-- 2026-04-10: V3 hot-flow / popular-stream work was explicitly removed from the current mainline. Active scope is now V1 token scoring + V2 arbitrary-address profiling + deployment/docs.
-- 2026-04-10: `C9` completed by another Codex. Tracked-address profile cache added (10-min TTL, per-address-id). MiniMax default timeout increased to 16s, persona max_tokens increased to 420. Homepage copy cleaned. Runtime consistency verified across V1/V2 paths. Token result page confirmed to render 3 individual fixed-address cards. Local acceptance tests passed: token API, address API, runtime files, build/lint all green. Next step is `T10` deployment.
-- 2026-04-11: `A7` completed by another Codex. V3 BSC real-trading contract document created at `docs/V3_TRADING_CONTRACT.md`. Covers 5 website trade API endpoints, AVE Bot API mapping, HMAC-SHA256 auth, BSC token conventions, skill V3 instructions (analyze/approve/buy/sell), confirmation requirement, output templates, risk controls, and new env vars. No implementation code written.
-- 2026-04-11: `C10` worker pass completed and moved to review. `POST /api/score-address` now returns `address + profile + cache + errors`, `/address/[address]` is profile-only again, homepage Address mode no longer promises `CZ` / `smartMoney` / fixed-address scores, and token scoring flow remains unchanged.
-- 2026-04-11: `C11` completed by another Codex. AVE Bot API server adapter at `apps/web/src/lib/ave-bot-client.ts` with HMAC-SHA256 signing. 5 trade API routes: wallet/generate, wallet, approve, swap, orders. Token page trading panel with wallet onboarding, deposit prompt, approve, buy/sell with base token select, slippage slider, order status. V3 trade types in `packages/core`. All 10 local acceptance tests passed: API shapes correct, token scoring blocks unchanged, build and lint green.
-- 2026-04-11: `O6` completed by another Codex. Skill `meme-affinity-query` updated with 4 instructions: analyze (unchanged), approve, buy, sell. All trade instructions require explicit user confirmation ("确认"). Failure semantics defined for: no assetsId, user did not confirm, approve failed, swap failed, order pending. Amount conversion rules (18 decimals for BNB/USDT). Output templates match V3_TRADING_CONTRACT.md section 6.
-- 2026-04-11: `G1` completed by another Codex. Deployment materials: `.gitignore` updated (excludes .claude, ext-cz-skill-*, repo, dev-preview.log, .runtime), `Dockerfile` (multi-stage standalone Next.js build), `docker-compose.yml` (web service with runtime volume, env_file, healthcheck, restart policy), `.dockerignore`, `README.md` rewritten with full deploy instructions, `.env.example` expanded with all env vars and REQUIRED/OPTIONAL markers. `next.config.ts` updated with `output: "standalone"`. Build and lint green. `docker compose config` not verified locally (no Docker on Windows).
-- 2026-04-11: `C12` completed by another Codex. Added `fastMiniMaxCall<T>()` wrapper in `apps/web/src/lib/score-token.ts` with 8s deadline. Before: MiniMax worst case ~32s (16s timeout × 2 retries) per scoring call before fallback. After: fallback fires within 8s per call. API shape unchanged (`ScoreTokenResponse` same 7 keys). Fallback still works — deterministic rules used when MiniMax times out or fails. Build and lint green.
-- 2026-04-11: `C12` revision: replaced fake fast-fail with true provider-level fast-mode. Added `fastModeTimeoutMs` to `MiniMaxPersonaScorerOptions` in `packages/core/src/providers/minimax.ts`. When set: overrides timeout to 8s and disables retries entirely. `score-token.ts` now creates a fast-mode scorer instead of wrapping calls in a setTimeout race. Removed `fastMiniMaxCall` wrapper. Each MiniMax call site uses direct try/catch with exactly one fallback side effect. `score-address.ts` untouched (still uses 16s + retries). API shape unchanged. Build and lint green.
-- 2026-04-11: `G4` completed. Removed temp files `staged.txt` and `h -u origin main`. Docs synced: C12 revision complete, next step is Hermes redeploy (T10).
-- 2026-04-11: `O7` completed. Production-facing copy pass: homepage fixed 3 mixed-language spots ("smart wallet overlap" → Chinese, "1 active" → "1 位", "N watchers" → "N 位观察者"), address page fixed 2 English error messages → Chinese. Skill 4-instruction validation passed (analyze/approve/buy/sell all clean, confirmation prompts clear, onboarding gate clear, error templates concise). Token page and /tech page unchanged — already clean. No structural changes. Build and lint green.
-- 2026-04-12: `C13` completed. Frozen driver system switch confirmed: tracked-address scoring uses frozen driver snapshots (not live chain queries). Tech page updated: FLOW_STEPS and SCORE_CHANNELS rewritten in Chinese, new "系统说明" section covering frozen driver system, MiniMax 60s no-retry strategy, V3 trading status. Address page enhanced: added summary paragraph and evidence list while keeping minimalist large-font design. Build and lint green.
-- 2026-04-12: `D1` completed. Full documentation rewrite: created `docs/ARCHITECTURE.md` (comprehensive architecture guide covering system overview, repo structure, scoring architecture, frozen driver system, MiniMax provider, trading, API reference, data flows, configuration, design system), created `docs/RUNBOOK.md` (operations runbook covering local development, production deployment, monitoring, failure recovery, frozen driver maintenance, security notes, smoke tests, demo tokens), updated `docs/PROJECT_HANDOFF.md` (concise current-state handoff reflecting all completed work), updated `docs/TASK_TRACKER.md` (added C13 and D1 entries). Build and lint green.
-- 2026-04-12: V4 documentation/ops handoff pass started by `V4 Agent 3`. Added `V4-A`, `V4-B`, and `V4-C` as non-done tracker items; docs now distinguish `V3` (already implemented) vs `V4` (per-user key mode, not launched), including SQLite path, `USER_CREDENTIALS_MASTER_KEY`, persistence mount, backup/restore, and rollback notes.
-- 2026-04-12: V4 docs continuation by `V4 Agent 3`: explicitly marked `V4-A core` as in-progress, recorded that per-user key mode has not passed acceptance, and clarified that global env credential fallback is migration-only (not final V4 architecture).
-- 2026-04-12: V4 semantics alignment pass by `V4 Agent 3`: aligned docs to latest backend meaning that V4 primary path supports `no assetsId` direct wallet generation with per-user keys and returns `assetsId + bindingCode + walletAddress`; marked `/api/trade/wallet/generate` as V3 legacy path; kept V4 non-live and non-done statuses.
+- 2026-04-10: `C1` reviewed and moved to revision. Required fixes: pass `token_address` into `address/tx`, use MiniMax for final fixed-address scoring, and align MiniMax provider.
+- 2026-04-10: `C1` revision reviewed and accepted.
+- 2026-04-10: `O2` reviewed and accepted. Public OpenClaw skill output now includes token name, narratives, persona/smartmoney/fixed-address scores, and result link.
+- 2026-04-10: `C2` reviewed and accepted.
+- 2026-04-10: `O3` reviewed and accepted. Fixed-address capability docs and 24h smartmoney snapshot contract.
+- 2026-04-10: `C3` reviewed and accepted. Local live website path with real AVE metrics and 24h smartmoney snapshot.
+- 2026-04-10: `O4` reviewed and accepted. Public OpenClaw skill output matches live website contract.
+- 2026-04-10: `C4` reviewed and accepted. Local smoke closure passed.
+- 2026-04-10: `C5` reviewed and accepted. MiniMax defaults aligned with Anthropic-compatible route.
+- 2026-04-10: Local live validation confirmed API path is healthy; deploy priority lowered.
+- 2026-04-10: `C6` completed. 6-token matrix run; recommended demo tokens selected.
+- 2026-04-10: `C8` completed. Added `POST /api/score-address`, `/address/[address]`, homepage dual-mode input.
+- 2026-04-10: `C9` completed. Tracked-address cache, MiniMax tuning, runtime consistency verified, local acceptance tests passed.
+- 2026-04-11: `A7` completed. V3 trading contract document.
+- 2026-04-11: `C10` completed. Address flow re-scoped to pure profile.
+- 2026-04-11: `C11` completed. AVE Bot API adapter + 5 trade routes + trading panel.
+- 2026-04-11: `O6` completed. Skill approve/buy/sell instructions.
+- 2026-04-11: `G1` completed. Deployment materials ready.
+- 2026-04-11: `C12` completed. MiniMax fast-mode optimization.
+- 2026-04-11: `G4` completed. Repo cleanup and docs synced.
+- 2026-04-11: `O7` completed. Production-facing copy and skill validation.
+- 2026-04-12: `C13` completed. Frozen driver system switch.
+- 2026-04-12: `D1` completed. Full documentation rewrite.
+- 2026-04-13: `V4-W` completed. V4 wallet-binding refactor: removed per-user key system (credential-store.ts, credential-crypto.ts, trade-config-panel.tsx, trade/config route); created binding-store.ts for wallet binding relationships; rewrote resolve-trade-credential.ts for platform-managed model; updated all trade API routes; rewrote trade-panel.tsx for wallet+binding code UX; updated core types (removed per-user credential types, added binding types); updated SKILL.md and openai.yaml; updated all docs (ARCHITECTURE, RUNBOOK, HANDOFF, TRACKER, README). Build and lint green.
 
 ## Ready For Review
 

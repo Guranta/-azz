@@ -4,17 +4,28 @@ import {
   AveBotApiError,
   createAveBotClientFromEnv,
 } from "@/lib/ave-bot-client";
+import { insertBinding } from "@/lib/binding-store";
 
 export async function POST() {
   try {
     const client = createAveBotClientFromEnv();
     const wallet = await client.generateWallet();
-    return NextResponse.json(wallet);
+
+    // Create binding record with generated bindingCode
+    const binding = insertBinding({
+      assetsId: wallet.assetsId,
+      walletAddress: wallet.walletAddress,
+    });
+
+    return NextResponse.json({
+      ...wallet,
+      bindingCode: binding.bindingCode,
+    });
   } catch (error) {
     if (error instanceof AveBotConfigError) {
       return NextResponse.json(
-        { error: "AVE Bot API not configured on server" },
-        { status: 401 }
+        { error: "AVE Bot API not configured on server", code: "CONFIG_ERROR" },
+        { status: 503 }
       );
     }
 

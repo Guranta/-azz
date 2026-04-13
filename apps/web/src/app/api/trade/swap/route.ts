@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   // Validation
   if ((!assetsId && !bindingCode) || !tokenAddress || !side || !amount || slippageBps === undefined || !confirmToken) {
     return NextResponse.json(
-      { error: "bindingCode (V4) or assetsId (V3), tokenAddress, side, amount, slippageBps, and confirmToken are required" },
+      { error: "bindingCode (or assetsId), tokenAddress, side, amount, slippageBps, and confirmToken are required" },
       { status: 400 }
     );
   }
@@ -81,15 +81,9 @@ export async function POST(request: Request) {
     const resolved = resolveAveBotClient({ assetsId, bindingCode });
 
     if (!resolved) {
-      if (bindingCode) {
-        return NextResponse.json(
-          { error: "Invalid or inactive bindingCode", code: "BINDING_NOT_FOUND" },
-          { status: 404 }
-        );
-      }
       return NextResponse.json(
-        { error: "AVE Bot API not configured on server (V3 fallback unavailable)", code: "NO_ENV_CONFIG" },
-        { status: 401 }
+        { error: "Invalid or inactive bindingCode", code: "BINDING_NOT_FOUND" },
+        { status: 404 }
       );
     }
 
@@ -105,8 +99,8 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AveBotConfigError) {
       return NextResponse.json(
-        { error: "AVE Bot API not configured on server" },
-        { status: 401 }
+        { error: "AVE Bot API not configured on server", code: "CONFIG_ERROR" },
+        { status: 503 }
       );
     }
 

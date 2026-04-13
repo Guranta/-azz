@@ -17,6 +17,7 @@ skill: meme-affinity-query
 BSC meme-token affinity analysis and trading product:
 - Public website for token scoring, address profiling, and BSC trading
 - OpenClaw skill for token analysis and trade instructions
+- Platform-managed wallets with binding codes (绑定码)
 
 ## Workspace Layout
 
@@ -27,6 +28,18 @@ config            Persona and tracked-address configuration
 skills            OpenClaw skill assets
 docs              Project handoff and task tracking
 ```
+
+## Trading Flow
+
+1. User clicks "创建钱包" on the website
+2. Website creates a platform-managed delegate wallet via AVE Bot API
+3. Website returns wallet address and 绑定码 (binding code) to the user
+4. User deposits BNB or USDT to the wallet address
+5. User can now approve tokens and buy/sell on the website
+6. For OpenClaw: user sends `bind <绑定码>` to bind the skill session
+7. Skill then supports `approve`, `buy`, `sell` using the binding code
+
+Users never provide API keys or secrets. The platform manages all AVE Bot credentials.
 
 ## Local Development
 
@@ -48,7 +61,7 @@ All deployment files live under `/opt/meme-affinity/`:
   app/                    # git clone of this repo
   env/
     .env.production       # production environment variables
-  runtime/                # AVE metrics, smartmoney snapshots (persisted)
+  runtime/                # AVE metrics, smartmoney snapshots, binding DB (persisted)
 ```
 
 ### VPS Prerequisites
@@ -66,8 +79,6 @@ All deployment files live under `/opt/meme-affinity/`:
 sudo mkdir -p /opt/meme-affinity/{app,env,runtime}
 
 # 2. Set runtime directory ownership for the container user (UID/GID 1001)
-#    This is required — the container runs as nextjs (1001:1001) and the
-#    bind mount masks the image-layer permissions.
 sudo chown 1001:1001 /opt/meme-affinity/runtime
 
 # 3. Clone the repo
@@ -93,9 +104,9 @@ MINIMAX_BASE_URL=https://api.minimaxi.com/anthropic
 MINIMAX_API_STYLE=anthropic
 MINIMAX_MODEL=MiniMax-M2.7
 
-# OPTIONAL — AVE Bot Wallet API (enables V3 trading features)
-# AVE_BOT_API_KEY=
-# AVE_BOT_API_SECRET=
+# REQUIRED — AVE Bot Wallet API (enables trading features)
+AVE_BOT_API_KEY=<your_ave_bot_api_key>
+AVE_BOT_API_SECRET=<your_ave_bot_api_secret>
 # AVE_BOT_BASE_URL=https://bot-api.ave.ai
 
 # REQUIRED — public URL of this deployment
@@ -175,7 +186,7 @@ For HTTPS, add SSL certificates (e.g. via certbot/Let's Encrypt) and update the 
 
 ### Runtime Data
 
-The runtime directory `/opt/meme-affinity/runtime` stores AVE metrics and smartmoney snapshots. It is bind-mounted into the container at `/app/apps/web/.runtime` and persists across container restarts and rebuilds.
+The runtime directory `/opt/meme-affinity/runtime` stores AVE metrics, smartmoney snapshots, and the wallet binding database. It is bind-mounted into the container at `/app/apps/web/.runtime` and persists across container restarts and rebuilds.
 
 To inspect:
 
@@ -199,18 +210,20 @@ POST /api/score-address
 Body: { "address": "0x...", "chain": "bsc" }
 ```
 
-### V3 Trading
+### Trading
 
 ```
-POST /api/trade/wallet/generate
-GET  /api/trade/wallet?assetsId=...
-POST /api/trade/approve
-POST /api/trade/swap
-GET  /api/trade/orders?ids=...
+POST /api/trade/wallet/generate          # Create platform-managed wallet
+GET  /api/trade/wallet?bindingCode=...    # Wallet identity + balance
+POST /api/trade/bind                      # Bind by bindingCode
+POST /api/trade/approve                   # Approve token for sell
+POST /api/trade/swap                      # Buy or sell
+GET  /api/trade/orders?ids=...            # Order status
 ```
 
 ## Planning Docs
 
 - `docs/PROJECT_HANDOFF.md` — master plan, progress, constraints
 - `docs/TASK_TRACKER.md` — live progress board
-- `docs/V3_TRADING_CONTRACT.md` — V3 trading API contract
+- `docs/ARCHITECTURE.md` — full architecture guide
+- `docs/RUNBOOK.md` — operations runbook

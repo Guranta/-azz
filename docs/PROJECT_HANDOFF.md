@@ -1,6 +1,6 @@
 # Project Handoff
 
-Last updated: 2026-04-12
+Last updated: 2026-04-13
 
 ## 1. Project Goal
 
@@ -25,7 +25,7 @@ The project focuses on BSC meme tokens launched from `fourmeme` and `flap`.
 - 3 tracked-address affinity scores (frozen driver system + MiniMax)
 - Smart-money heat (top100 ∩ smart-wallet overlap)
 - Wallet profile with archetype (畜生/P子/钻石手/数据不足)
-- BSC trading capability (buy/sell via AVE Bot Wallet)
+- BSC trading capability (buy/sell via platform-managed AVE Bot wallets)
 
 ## 2. Product Boundaries
 
@@ -39,8 +39,7 @@ The project focuses on BSC meme tokens launched from `fourmeme` and `flap`.
 - OpenClaw query skill
 - AVE token data + risk integration
 - MiniMax AI scoring (deterministic-first, AI-refined)
-- V3 BSC trading via AVE Bot Wallet
-- V4 architecture transition: per-user AVE Bot credentials (website input -> server encryption -> SQLite runtime persistence)
+- BSC trading via platform-managed AVE Bot wallets (wallet creation + binding code)
 - VPS deployment (Docker)
 
 ### Out of Scope
@@ -54,6 +53,7 @@ The project focuses on BSC meme tokens launched from `fourmeme` and `flap`.
 - Admin panel
 - Real-time hot-flow / popular-stream
 - Multiple public personas
+- Per-user API key management
 
 ## 3. Fixed Technical Decisions
 
@@ -66,8 +66,8 @@ The project focuses on BSC meme tokens launched from `fourmeme` and `flap`.
 | AI provider | MiniMax (Anthropic API, M2.7 model) |
 | Data provider | AVE API |
 | Trading | AVE Bot Wallet API (HMAC-SHA256) |
-| Credential ownership model | V3: server-level AVE key/secret; V4 target: per-user key/secret |
-| Credential storage model | V4 target: encrypted SQLite at `apps/web/.runtime/trade-credentials.db` |
+| Credential model | Platform-level AVE Bot key/secret; users never provide keys |
+| Binding model | SQLite at `apps/web/.runtime/trade-bindings.db` (wallet binding relationships) |
 | Deployment | Docker + docker-compose, standalone Next.js |
 | Build mode | webpack (Turbopack disabled for non-ASCII paths) |
 
@@ -89,6 +89,10 @@ Key source files:
 | `apps/web/src/lib/score-address.ts` | V2 address profiling orchestration |
 | `apps/web/src/lib/tracked-driver-systems.ts` | Frozen driver scoring logic |
 | `apps/web/src/lib/tracked-driver-systems.data.ts` | Frozen driver snapshot data |
+| `apps/web/src/lib/ave-bot-client.ts` | AVE Bot API client (HMAC-SHA256) |
+| `apps/web/src/lib/binding-store.ts` | Wallet binding store (SQLite) |
+| `apps/web/src/lib/resolve-trade-credential.ts` | Resolve bindingCode → client |
+| `apps/web/src/components/trade-panel.tsx` | Trading UI |
 | `packages/core/src/providers/minimax.ts` | MiniMax provider (fast mode, no retry) |
 | `packages/core/src/scoring/cz-affinity.ts` | Deterministic CZ scoring |
 | `packages/core/src/scoring/address-analysis.ts` | Address profile builder |
@@ -118,24 +122,10 @@ Key source files:
 4. Optional MiniMax refinement (60s no-retry)
 5. Derive archetype (畜生/P子/钻石手/数据不足)
 
-### V3 Trading (`/api/trade/*`)
+### Trading (`/api/trade/*`)
 
-5 endpoints: wallet/generate, wallet, approve, swap, orders.
-Server-side only; browser never sees AVE credentials.
-
-### V4 Credential Architecture (planned, not live)
-
-- User configures their own `AVE_BOT_API_KEY` / `AVE_BOT_API_SECRET` in website settings/trade surface.
-- If `assetsId` is missing, backend can directly generate wallet with that user's own key/secret.
-- Backend returns `assetsId + bindingCode + walletAddress` for bootstrap completion.
-- Server encrypts and stores credentials in SQLite (`apps/web/.runtime/trade-credentials.db`).
-- `assetsId` remains the binding key for user trade configuration.
-- `bindingCode` / 小龙虾 ID is the binding key for skill-to-user mapping.
-- `USER_CREDENTIALS_MASTER_KEY` is required in production before enabling this path.
-- `V4-A core` (credential vault core path) semantics are in place, but cross-agent integration and acceptance are pending.
-- Per-user key mode is therefore not yet accepted for production go-live.
-- Any global env credential fallback is migration-only compatibility and is not the final V4 architecture.
-- `/api/trade/wallet/generate` is retained for V3 legacy and is not the V4 primary workflow.
+6 endpoints: wallet/generate, wallet, bind, approve, swap, orders.
+Platform-managed wallets with binding codes. Users never provide API keys.
 
 ## 6. Execution History
 
@@ -145,29 +135,29 @@ All prior tasks are complete. Key milestones:
 |----|------|--------|
 | T1–T9 | Project skeleton through OpenClaw skill | done |
 | O1–O7 | Fixed-address capability, smartmoney, skill polish | done |
-| C1–C12 | API, UI, scoring, hardening, MiniMax optimization | done |
-| A7 | V3 trading contract (docs) | done |
-| C11 | V3 trading implementation | done |
+| C1–C13 | API, UI, scoring, hardening, MiniMax optimization, frozen driver | done |
+| A7, C11 | V3 trading contract + implementation | done |
 | G1, G4 | Deployment prep, repo cleanup | done |
+| V4-W | V4 wallet-binding refactor (platform-managed wallets + binding codes) | done |
 
 ### Current state
 
 - V1 token scoring: live and working
 - V2 address profiling: live and working
-- V3 BSC trading: implemented, ready for funded wallets
-- V4 per-user credential mode: primary backend semantics aligned (`no assetsId` -> user-key wallet generation -> return `assetsId + bindingCode + walletAddress`), but Agent1/Agent2 + production integration and acceptance are still pending (not launched)
+- Trading: platform-managed wallet model, binding code based
+  - Website creates wallets via AVE Bot API (platform key)
+  - Wallet bindings stored in SQLite (`trade-bindings.db`)
+  - Users get wallet address + 绑定码 (bindingCode)
+  - OpenClaw skill binds via `bind <绑定码>`
+  - All trade ops use binding code or assetsId
 - Frozen driver system: switched from live chain queries to static snapshots
 - MiniMax: 60s single-wait, no retry for all scoring paths
 - Deployment materials: Dockerfile, docker-compose.yml, nginx config ready
-- Runtime persistence requirement: `.runtime/trade-credentials.db` must be bind-mounted and backed up for V4
+- Runtime persistence: `.runtime/trade-bindings.db` must be bind-mounted and backed up
 
 ## 7. Pending Items
 
 - **VPS deployment** (`T10`): Deploy to Ubuntu VPS using docker-compose
-- **V4-A**: Core vault path landed semantically; complete cross-agent integration verification and acceptance sign-off
-- **V4-B**: Complete `assetsId` + `bindingCode` / 小龙虾 ID binding flow across website and skill
-- **V4-C**: Production rollout hardening (runtime DB persistence, backup/restore runbook, rollback rehearsal, legacy-path fallback guardrails)
-- **Auto-copy-trading**: Not yet implemented, planned for future
 - **Frozen driver refresh**: Current snapshots dated 2026-04-11, need periodic refresh
 
 ## 8. Documentation Map
@@ -176,7 +166,7 @@ All prior tasks are complete. Key milestones:
 |----------|---------|
 | `docs/ARCHITECTURE.md` | Full architecture guide |
 | `docs/RUNBOOK.md` | Operations and deployment runbook |
-| `docs/V3_TRADING_CONTRACT.md` | V3 trading API contract |
+| `docs/V3_TRADING_CONTRACT.md` | Trading API contract (historical reference) |
 | `docs/V2_ADDRESS_PROFILE_CONTRACT.md` | V2 address profiling contract |
 | `docs/MINIMAX_RUNTIME_CONTRACT.md` | MiniMax prompt/response contract |
 | `docs/TASK_TRACKER.md` | Task progress board |
@@ -188,7 +178,7 @@ All prior tasks are complete. Key milestones:
 
 Do not change without explicit approval:
 
-- Do not add an external business database without explicit approval (V4 runtime SQLite credential vault is the scoped exception)
+- Do not add an external business database without explicit approval (runtime SQLite binding store is the scoped exception)
 - Do not add a backend admin panel
 - Do not replace Next.js
 - Do not move shared contracts out of `packages/core`

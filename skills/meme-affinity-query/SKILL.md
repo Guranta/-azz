@@ -4,7 +4,7 @@ installUrl: skills/meme-affinity-query
 description: |
   BSC meme token analysis and trading skill.
   Five instructions: analyze, bind, approve, buy, sell.
-  Website-side binding required before trading; no secrets held in skill.
+  Website creates wallet and issues 绑定码; no secrets held in skill.
 tags:
   - bsc
   - meme
@@ -28,7 +28,7 @@ Public OpenClaw skill for the project.
 
 This skill stays thin.
 
-1. `bindingCode` / `小龙虾 ID` is the only external binding entry — no `assetsId` in skill-facing flows
+1. `绑定码` (`bindingCode`) is the only external binding entry — no `assetsId` in skill-facing flows
 2. `analyze` does not depend on binding state
 3. `approve` / `buy` / `sell` require binding state (`BOUND`)
 4. Skill only calls website API — never calls AVE/MiniMax/DeepSeek directly
@@ -66,29 +66,18 @@ State transitions:
 - `UNBOUND -> BOUND`: `bind <bindingCode>` success and returned status is `active`
 - `BOUND -> UNBOUND`: bind replaced/cleared, or bind verification fails on later operations
 
-## Website Dependency and Degradation Rules
-
-The skill must not assume website backend stability.
-
-- `bind`, `approve`, `buy`, `sell` all depend on website API availability and correctness
-- Per-user key mode is considered available only after website binding succeeds
-- If website binding/trade APIs return non-success or timeout, render `失败` (not `成功`)
-- Never infer a successful bind/trade from partial or missing response fields
-- Keep failure outputs actionable, but do not invent backend state
-
-## Website-First Onboarding (V4 Main Flow)
+## Website-First Onboarding
 
 Before any trade instruction in the skill, user onboarding happens on the website side:
 
-1. User opens website trade config and enters their own API key/secret.
-2. Website config supports two backend paths:
-   - User provides an existing `assetsId`.
-   - User does not provide `assetsId`, and website uses user key to generate wallet automatically.
-3. Website returns/exposes `bindingCode` (`小龙虾 ID`) for the user.
+1. User opens website and clicks "创建钱包".
+2. Website creates a platform-managed wallet via AVE Bot API.
+3. Website returns wallet address and `绑定码` (`bindingCode`) to the user.
 4. User runs `bind <bindingCode>` in the skill to enter bound state.
 
 Skill-side rule:
-- Normal skill flow never asks user to input `assetsId`; external binding entry remains only `bindingCode` / `小龙虾 ID`.
+- Normal skill flow never asks user to input `assetsId`; external binding entry remains only `绑定码` (`bindingCode`).
+- Users never need to provide API keys or secrets.
 
 ## Instructions
 
@@ -123,10 +112,10 @@ Token analysis. Calls website `/api/score-token`.
 
 ### `bind <bindingCode>`
 
-Bind OpenClaw skill context to website trade credentials.
+Bind OpenClaw skill context to website wallet.
 
 **Parameters:**
-- `bindingCode`: the user-provided binding string (also called `小龙虾 ID`)
+- `bindingCode`: the user-provided binding string (`绑定码`)
 
 **Execution:**
 
@@ -141,10 +130,10 @@ Bind OpenClaw skill context to website trade credentials.
 
 ```text
 ✅ 已绑定
-小龙虾 ID: {bindingCode}
-钱包: {wallet.address}
+绑定码: {bindingCode}
+钱包: {wallet.walletAddress}
 状态: 已绑定
-后续可直接使用 approve / buy / sell（无需输入 assetsId）
+后续可直接使用 approve / buy / sell
 ```
 
 If `wallet` is null in the bind response (AVE API temporarily unreachable), omit the 钱包 line.
@@ -153,25 +142,25 @@ If `wallet` is null in the bind response (AVE API temporarily unreachable), omit
 
 ```text
 ❌ 绑定失败
-小龙虾 ID: {bindingCode}
-原因: 无效或不存在的 bindingCode
-请在网站交易配置页复制最新“小龙虾 ID”后重试
+绑定码: {bindingCode}
+原因: 无效或不存在的绑定码
+请在网站创建钱包后复制最新"绑定码"后重试
 ```
 
-**Bind failure output (`失败`, non-active credential):**
+**Bind failure output (`失败`, non-active binding):**
 
 ```text
 ❌ 绑定失败
-小龙虾 ID: {bindingCode}
-原因: 凭证状态不是 active
-请在网站启用该配置后重试
+绑定码: {bindingCode}
+原因: 钱包状态不是 active
+请在网站重新创建钱包后重试
 ```
 
 **Bind failure output (`失败`, website unavailable / unstable):**
 
 ```text
 ❌ 绑定失败
-小龙虾 ID: {bindingCode}
+绑定码: {bindingCode}
 原因: 网站绑定服务暂不可用或返回异常
 请稍后重试；成功前不会进入已绑定状态
 ```
@@ -190,9 +179,9 @@ If `wallet` is null in the bind response (AVE API temporarily unreachable), omit
 
 ```text
 ⚠️ 未绑定
-请先绑定小龙虾 ID（bindingCode）后再交易
-发送：bind <bindingCode>
-如果还没有小龙虾 ID，请先在网站交易配置页完成配置并复制该 ID
+请先绑定绑定码后再交易
+发送：bind <绑定码>
+如果还没有绑定码，请先在网站创建钱包并复制绑定码
 ```
 
 **Shared confirmation gate:**
@@ -206,7 +195,7 @@ If user response is not exact `确认`, cancel immediately and do not call trade
 🟡 待确认
 操作: approve（授权卖出）
 代币: {tokenAddress}
-回复”确认”执行，回复”取消”放弃
+回复"确认"执行，回复"取消"放弃
 ```
 
 **Buy confirmation (`待确认`):**
@@ -217,7 +206,7 @@ If user response is not exact `确认`, cancel immediately and do not call trade
 代币: {tokenAddress}
 数量: {amount} {baseToken}
 滑点: {slippageBps / 100}%
-回复”确认”执行，回复”取消”放弃
+回复"确认"执行，回复"取消"放弃
 ```
 
 **Sell confirmation (`待确认`):**
@@ -228,7 +217,7 @@ If user response is not exact `确认`, cancel immediately and do not call trade
 代币: {tokenAddress}
 数量: {amount} {baseToken}
 滑点: {slippageBps / 100}%
-回复”确认”执行，回复”取消”放弃
+回复"确认"执行，回复"取消"放弃
 ```
 
 ---

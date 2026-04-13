@@ -211,14 +211,18 @@ export interface TradeTokenBalance {
 
 export interface GenerateWalletResponse {
   assetsId: string;
-  address: string;
+  walletAddress: string;
   chain: "bsc";
   createdAt: string;
 }
 
+export interface GenerateWalletWithBindingResponse extends GenerateWalletResponse {
+  bindingCode: string;
+}
+
 export interface GetWalletResponse {
   assetsId: string;
-  address: string;
+  walletAddress: string;
   chain: "bsc";
   status: "enabled" | "disabled";
   type: "self" | "delegate";
@@ -227,7 +231,8 @@ export interface GetWalletResponse {
 }
 
 export interface ApproveRequest {
-  assetsId: string;
+  assetsId?: string;
+  bindingCode?: string;
   tokenAddress: string;
 }
 
@@ -238,7 +243,8 @@ export interface ApproveResponse {
 }
 
 export interface SwapRequest {
-  assetsId: string;
+  assetsId?: string;
+  bindingCode?: string;
   tokenAddress: string;
   side: "buy" | "sell";
   amount: string;
@@ -274,65 +280,21 @@ export interface GetOrdersResponse {
   orders: OrderStatus[];
 }
 
-// V4 Trade credential config types
+// Wallet binding types (platform-managed wallets)
 
-export type CredentialStatus = "active" | "disabled";
+export type BindingStatus = "active" | "disabled";
 
-export interface TradeCredentialConfig {
+export interface WalletBinding {
   assetsId: string;
+  walletAddress: string;
   bindingCode: string;
-  encryptedApiKey: string;
-  encryptedApiSecret: string;
-  baseUrl: string;
-  status: CredentialStatus;
+  status: BindingStatus;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateTradeConfigRequest {
-  assetsId?: string;
-  apiKey: string;
-  apiSecret: string;
-  baseUrl?: string;
-}
-
-export interface CreateTradeConfigResponse {
+export interface BindResponse {
   assetsId: string;
-  bindingCode: string;
-  maskedApiKey: string;
-  walletAddress?: string;
-  status: CredentialStatus;
-  updatedAt: string;
-}
-
-export interface GetTradeConfigResponse {
-  assetsId: string;
-  bindingCode: string;
-  hasConfig: boolean;
-  maskedApiKey: string;
-  status: CredentialStatus;
-  updatedAt: string;
-}
-
-export interface DeleteTradeConfigResponse {
-  success: boolean;
-  assetsId: string;
-}
-
-export interface BindTradeConfigRequest {
-  bindingCode: string;
-}
-
-export interface BindTradeConfigResponse {
-  assetsId: string;
-  status: CredentialStatus;
-}
-
-/** Extended request types with optional bindingCode support */
-export interface ApproveRequestV4 extends ApproveRequest {
-  bindingCode?: string;
-}
-
-export interface SwapRequestV4 extends SwapRequest {
-  bindingCode?: string;
+  status: BindingStatus;
+  wallet?: GetWalletResponse | null;
 }

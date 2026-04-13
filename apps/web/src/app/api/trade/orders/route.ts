@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const ids = url.searchParams.get("ids")?.trim();
   const bindingCode = url.searchParams.get("bindingCode")?.trim();
+  const assetsId = url.searchParams.get("assetsId")?.trim();
 
   if (!ids) {
     return NextResponse.json(
@@ -17,15 +18,15 @@ export async function GET(request: Request) {
     );
   }
 
-  if (!bindingCode) {
+  if (!bindingCode && !assetsId) {
     return NextResponse.json(
-      { error: "bindingCode is required for order queries" },
+      { error: "bindingCode (or assetsId) is required for order queries" },
       { status: 400 }
     );
   }
 
   try {
-    const resolved = resolveAveBotClient({ bindingCode });
+    const resolved = resolveAveBotClient({ assetsId, bindingCode });
 
     if (!resolved) {
       return NextResponse.json(
@@ -39,8 +40,8 @@ export async function GET(request: Request) {
   } catch (error) {
     if (error instanceof AveBotConfigError) {
       return NextResponse.json(
-        { error: "AVE Bot API not configured on server" },
-        { status: 401 }
+        { error: "AVE Bot API not configured on server", code: "CONFIG_ERROR" },
+        { status: 503 }
       );
     }
 

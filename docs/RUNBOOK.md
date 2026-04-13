@@ -1,6 +1,6 @@
 # Operations Runbook
 
-Last updated: 2026-04-12
+Last updated: 2026-04-13
 
 ---
 
@@ -52,15 +52,6 @@ npm run lint && npm run build
 
 ## 2. Production Deployment
 
-Current release baseline is V3 trading. V4 per-user credential storage is documented here as rollout guidance and is not declared live yet.
-
-V4 rollout status constraints:
-- `V4-A core` semantics are available, but integration/acceptance is still pending.
-- Per-user key mode has not completed acceptance.
-- Any global env credential fallback is migration-only and must not be documented as the final V4 architecture.
-- V4 primary bootstrap semantics: if no `assetsId`, backend can generate wallet with that user's own AVE key/secret and return `assetsId + bindingCode + walletAddress`.
-- `/api/trade/wallet/generate` remains V3 legacy path, not V4 primary flow.
-
 ### 2.1 VPS Prerequisites
 
 - Ubuntu 20.04+ (8 GB RAM recommended)
@@ -75,7 +66,7 @@ V4 rollout status constraints:
 /opt/meme-affinity/
   app/                    # git clone of this repo
   env/.env.production     # production environment variables
-  runtime/                # bind-mounted runtime data (AVE metrics, caches, V4 SQLite credential DB)
+  runtime/                # bind-mounted runtime data (AVE metrics, caches, binding DB)
 ```
 
 ### 2.3 Initial Deployment
@@ -94,9 +85,6 @@ chown 1001:1001 /opt/meme-affinity/runtime
 cp .env.example /opt/meme-affinity/env/.env.production
 nano /opt/meme-affinity/env/.env.production
 # Fill in all REQUIRED variables
-
-# V4 credential-vault gate (required before enabling V4):
-# USER_CREDENTIALS_MASTER_KEY=<high-entropy-secret>
 
 # Build and start
 docker compose up -d --build
@@ -143,16 +131,16 @@ docker compose logs -f web
 
 ### 2.6 Rollback (Code/Image, Keep Runtime Data)
 
-Use this for bad releases while preserving runtime files (including V4 SQLite credential DB).
+Use this for bad releases while preserving runtime files (including binding DB).
 
 ```bash
 cd /opt/meme-affinity/app
 
-# Optional: create a pre-rollback backup snapshot for runtime DB
+# Optional: create a pre-rollback backup snapshot
 mkdir -p /opt/meme-affinity/runtime/backup
-[ -f /opt/meme-affinity/runtime/trade-credentials.db ] && \
-  cp /opt/meme-affinity/runtime/trade-credentials.db \
-     /opt/meme-affinity/runtime/backup/trade-credentials.db.$(date +%F-%H%M%S)
+[ -f /opt/meme-affinity/runtime/trade-bindings.db ] && \
+  cp /opt/meme-affinity/runtime/trade-bindings.db \
+     /opt/meme-affinity/runtime/backup/trade-bindings.db.$(date +%F-%H%M%S)
 
 # Roll code/image back
 git fetch origin
@@ -162,7 +150,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-### 2.7 V4 Runtime DB Persistence (Docker/VPS)
+### 2.7 Runtime DB Persistence (Docker/VPS)
 
 Current compose mount:
 
@@ -173,21 +161,9 @@ volumes:
 
 With this mount, the SQLite file path mapping is:
 
-- Host: `/opt/meme-affinity/runtime/trade-credentials.db`
-- Container: `/app/apps/web/.runtime/trade-credentials.db`
-- Repo/runtime path: `apps/web/.runtime/trade-credentials.db`
-
-`USER_CREDENTIALS_MASTER_KEY` must be present in `/opt/meme-affinity/env/.env.production` before enabling V4.
-
-Compatibility note:
-- During migration, deployments might still rely on global env credentials (`AVE_BOT_API_KEY`, `AVE_BOT_API_SECRET`).
-- That compatibility path is not the V4 target state and cannot be used as V4 acceptance evidence.
-
-### 2.8 Bootstrap Path Classification
-
-- V4 primary path (per-user key mode): user submits own AVE bot key/secret, and when `assetsId` is missing backend generates wallet and returns `assetsId + bindingCode + walletAddress`.
-- V3 legacy path: `/api/trade/wallet/generate` with platform-level credentials.
-- Until acceptance closure, treat V4 as rollout-in-progress and do not declare live cutover.
+- Host: `/opt/meme-affinity/runtime/trade-bindings.db`
+- Container: `/app/apps/web/.runtime/trade-bindings.db`
+- Repo/runtime path: `apps/web/.runtime/trade-bindings.db`
 
 ---
 
@@ -212,11 +188,11 @@ cat /opt/meme-affinity/runtime/ave-metrics.json
 # Smart-money snapshot
 cat /opt/meme-affinity/runtime/smartmoney-snapshot.json
 
-# V4 credential DB (exists check)
-ls -lah /opt/meme-affinity/runtime/trade-credentials.db
+# Binding DB (exists check)
+ls -lah /opt/meme-affinity/runtime/trade-bindings.db
 
 # SQLite integrity quick check (if sqlite3 installed)
-sqlite3 /opt/meme-affinity/runtime/trade-credentials.db "PRAGMA integrity_check;"
+sqlite3 /opt/meme-affinity/runtime/trade-bindings.db "PRAGMA integrity_check;"
 ```
 
 ### 3.3 Logs
@@ -234,15 +210,13 @@ docker compose logs --tail 100 web
 
 ### 3.4 Backup and Restore (Runtime SQLite)
 
-V4 is not declared live yet, but backup policy should be prepared before rollout.
-
 ```bash
 # Backup directory
 mkdir -p /opt/meme-affinity/runtime/backup
 
 # Create timestamped DB backup
-cp /opt/meme-affinity/runtime/trade-credentials.db \
-  /opt/meme-affinity/runtime/backup/trade-credentials.db.$(date +%F-%H%M%S)
+cp /opt/meme-affinity/runtime/trade-bindings.db \
+  /opt/meme-affinity/runtime/backup/trade-bindings.db.$(date +%F-%H%M%S)
 ```
 
 Restore procedure:
@@ -253,11 +227,11 @@ cd /opt/meme-affinity/app
 docker compose stop web
 
 # 2) Restore selected backup
-cp /opt/meme-affinity/runtime/backup/trade-credentials.db.<timestamp> \
-  /opt/meme-affinity/runtime/trade-credentials.db
+cp /opt/meme-affinity/runtime/backup/trade-bindings.db.<timestamp> \
+  /opt/meme-affinity/runtime/trade-bindings.db
 
 # 3) Ensure ownership and restart
-chown 1001:1001 /opt/meme-affinity/runtime/trade-credentials.db
+chown 1001:1001 /opt/meme-affinity/runtime/trade-bindings.db
 docker compose up -d web
 ```
 
@@ -281,7 +255,7 @@ docker compose up -d web
 
 **Recovery:** Wait for AVE to recover. The site shows graceful error messages.
 
-### 4.3 AVE Bot API Down (V3 Trading)
+### 4.3 AVE Bot API Down (Trading)
 
 **Symptom:** Trade operations fail with 502 errors.
 
@@ -310,20 +284,20 @@ rm /opt/meme-affinity/runtime/ave-metrics.json
 rm /opt/meme-affinity/runtime/smartmoney-snapshot.json
 ```
 
-Do **not** delete `/opt/meme-affinity/runtime/trade-credentials.db` blindly.
+Do **not** delete `/opt/meme-affinity/runtime/trade-bindings.db` blindly.
 
-### 4.6 V4 Credential DB Corruption (SQLite)
+### 4.6 Binding DB Corruption (SQLite)
 
 ```bash
 # Check integrity
-sqlite3 /opt/meme-affinity/runtime/trade-credentials.db "PRAGMA integrity_check;"
+sqlite3 /opt/meme-affinity/runtime/trade-bindings.db "PRAGMA integrity_check;"
 
 # If integrity check fails: stop, restore backup, restart
 cd /opt/meme-affinity/app
 docker compose stop web
-cp /opt/meme-affinity/runtime/backup/trade-credentials.db.<timestamp> \
-  /opt/meme-affinity/runtime/trade-credentials.db
-chown 1001:1001 /opt/meme-affinity/runtime/trade-credentials.db
+cp /opt/meme-affinity/runtime/backup/trade-bindings.db.<timestamp> \
+  /opt/meme-affinity/runtime/trade-bindings.db
+chown 1001:1001 /opt/meme-affinity/runtime/trade-bindings.db
 docker compose up -d web
 ```
 
@@ -383,14 +357,12 @@ Set `MINIMAX_MODEL` environment variable. No code changes needed.
 
 - AVE Data API key
 - MiniMax API key (or Anthropic key alias)
-- V3 mode: platform AVE Bot API key + secret
-- V4 mode (planned): encrypted per-user AVE Bot key/secret in SQLite (`trade-credentials.db`)
-- `USER_CREDENTIALS_MASTER_KEY` (required in production for V4)
+- AVE Bot API key + secret (platform-level, used for all wallet operations)
 
 ### 7.2 What the browser holds
 
-- `assetsId` string in localStorage (V3 current; still used as V4 trade-config binding anchor)
-- `bindingCode` / 小龙虾 ID used for skill binding (V4 planned binding path)
+- `assetsId` string in localStorage
+- `bindingCode` (绑定码) string in localStorage
 - No API keys, no private keys, no mnemonics
 
 ### 7.3 What is never stored
@@ -398,6 +370,7 @@ Set `MINIMAX_MODEL` environment variable. No code changes needed.
 - AVE Bot wallet mnemonic (discarded after generation)
 - AVE API credentials in client-side code
 - Raw API error details (server logs only)
+- User-provided API keys (users never provide keys)
 
 ---
 
@@ -411,8 +384,7 @@ Run these after every deployment:
 - [ ] `curl -s -X POST http://localhost:3000/api/score-address -H 'Content-Type: application/json' -d '{"address":"0x2a1c7bc7e697f6bff5ae9122c5b0212fe5ac42aa","chain":"bsc"}' | jq '.profile.archetype'` – returns archetype
 - [ ] `curl -s -X POST http://localhost:3000/api/score-token -H 'Content-Type: application/json' -d '{"tokenAddress":"0x123"}' | jq '.error'` – returns error (400)
 - [ ] Runtime files exist: `ls /opt/meme-affinity/runtime/`
-- [ ] V4 prep: env has `USER_CREDENTIALS_MASTER_KEY` in `/opt/meme-affinity/env/.env.production` (do not print full value)
-- [ ] V4 prep: SQLite file visible after first credential write: `ls -lah /opt/meme-affinity/runtime/trade-credentials.db`
+- [ ] Binding DB visible after first wallet creation: `ls -lah /opt/meme-affinity/runtime/trade-bindings.db`
 
 ---
 
@@ -447,4 +419,4 @@ This counter:
 
 To reset: delete the file. It recreates on next API call.
 
-V4 (planned) runtime credential DB path is `apps/web/.runtime/trade-credentials.db` (host: `/opt/meme-affinity/runtime/trade-credentials.db`). This file must be persisted and backed up.
+Runtime binding DB path is `apps/web/.runtime/trade-bindings.db` (host: `/opt/meme-affinity/runtime/trade-bindings.db`). This file must be persisted and backed up.

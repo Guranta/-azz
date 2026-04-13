@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCredentialByBindingCode } from "@/lib/credential-store";
-import { createAveBotClient } from "@/lib/ave-bot-client";
-import { decrypt } from "@/lib/credential-crypto";
-import type { BindTradeConfigResponse, GetWalletResponse } from "@meme-affinity/core";
+import { getBindingByBindingCode } from "@/lib/binding-store";
+import { createAveBotClientFromEnv } from "@/lib/ave-bot-client";
+import type { BindResponse, GetWalletResponse } from "@meme-affinity/core";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
@@ -18,19 +17,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const cred = getCredentialByBindingCode(bindingCode);
+  const binding = getBindingByBindingCode(bindingCode);
 
-  if (!cred) {
+  if (!binding) {
     return NextResponse.json(
       { error: "Invalid bindingCode", code: "BINDING_NOT_FOUND" },
       { status: 404 }
     );
   }
 
-  if (cred.status !== "active") {
-    const response: BindTradeConfigResponse = {
-      assetsId: cred.assetsId,
-      status: cred.status,
+  if (binding.status !== "active") {
+    const response: BindResponse = {
+      assetsId: binding.assetsId,
+      status: binding.status,
     };
     return NextResponse.json(response);
   }
@@ -38,19 +37,15 @@ export async function POST(request: Request) {
   // Best-effort: fetch wallet so front-end can render immediately
   let wallet: GetWalletResponse | null = null;
   try {
-    const client = createAveBotClient({
-      apiKey: decrypt(cred.encryptedApiKey),
-      apiSecret: decrypt(cred.encryptedApiSecret),
-      baseUrl: cred.baseUrl || undefined,
-    });
-    wallet = await client.getWalletByAssetsId(cred.assetsId);
+    const client = createAveBotClientFromEnv();
+    wallet = await client.getWalletByAssetsId(binding.assetsId);
   } catch {
     // Non-fatal: bind still succeeds, wallet fetched later via GET /trade/wallet
   }
 
-  const response: BindTradeConfigResponse & { wallet?: GetWalletResponse | null } = {
-    assetsId: cred.assetsId,
-    status: cred.status,
+  const response: BindResponse & { wallet?: GetWalletResponse | null } = {
+    assetsId: binding.assetsId,
+    status: binding.status,
     wallet,
   };
 

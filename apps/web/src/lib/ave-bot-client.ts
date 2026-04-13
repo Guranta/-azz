@@ -161,7 +161,9 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
   ): Promise<T> {
     const timestamp = toRfc3339Nano();
     const signedBody = body ? compactJsonStringify(body) : "";
-    const sign = buildSignature(timestamp, method, requestPath, signedBody, apiSecret);
+    // GET query params must NOT be included in the signature per official docs
+    const signPath = method === "GET" ? requestPath.split("?")[0] : requestPath;
+    const sign = buildSignature(timestamp, method, signPath, signedBody, apiSecret);
 
     const url = `${baseUrl}${requestPath}`;
     const controller = new AbortController();
@@ -224,7 +226,7 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
       // Explicitly discard mnemonic — AVE manages custody
       return {
         assetsId: data.assetsId,
-        address: bscEntry.address,
+        walletAddress: bscEntry.address,
         chain: "bsc",
         createdAt: new Date().toISOString(),
       };
@@ -315,7 +317,7 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
 
       return {
         assetsId: user.assetsId,
-        address: bscEntry.address,
+        walletAddress: bscEntry.address,
         chain: "bsc",
         status: (bscEntry.status as "enabled" | "disabled") || "enabled",
         type: (bscEntry.type as "self" | "delegate") || "delegate",
@@ -386,6 +388,7 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
           swapType: params.side,
           slippage: String(params.slippageBps),
           extraGas: "0",
+          useMev: true,
         }
       );
 
