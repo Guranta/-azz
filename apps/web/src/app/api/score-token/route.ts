@@ -4,6 +4,7 @@ import {
   AveConfigurationError,
   scoreTokenRequest,
 } from "@/lib/score-token";
+import { addToCandidatePool } from "@/lib/strategy-candidate-pool";
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as
@@ -31,6 +32,9 @@ export async function POST(request: Request) {
       tokenAddress,
       chain: "bsc",
     });
+
+    // Feed successfully scored tokens into the strategy candidate pool
+    addToCandidatePool(tokenAddress);
 
     return NextResponse.json(response);
   } catch (error) {

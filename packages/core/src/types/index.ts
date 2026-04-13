@@ -298,3 +298,82 @@ export interface BindResponse {
   status: BindingStatus;
   wallet?: GetWalletResponse | null;
 }
+
+// V6 Strategy Simulator types
+
+export type StrategyId = "gambler" | "p-zi" | "diamond";
+
+export interface StrategyHolding {
+  tokenAddress: string;
+  tokenName: string;
+  tokenSymbol: string;
+  quantity: number;
+  entryProxyPrice: number;
+  currentProxyPrice: number;
+  entryAt: string;
+  currentValueUsd: number;
+  pnlPct: number;
+}
+
+export interface StrategyTradeRecord {
+  action: "buy" | "sell";
+  tokenAddress: string;
+  tokenName: string;
+  tokenSymbol: string;
+  amountUsd: number;
+  quantity: number;
+  proxyPrice: number;
+  reason: string;
+  executedAt: string;
+}
+
+export type StrategyDraftAction = "buy" | "sell" | "hold";
+
+export interface StrategyDraft {
+  strategyId: StrategyId;
+  action: StrategyDraftAction;
+  tokenAddress: string | null;
+  baseToken: "usdt";
+  amount: number;
+  reason: string;
+  generatedAt: string;
+}
+
+export interface StrategyEquityPoint {
+  strategyId: StrategyId;
+  pointAt: string;
+  equityUsd: number;
+}
+
+export interface StrategySnapshot {
+  strategyId: StrategyId;
+  strategyName: string;
+  cashUsd: number;
+  holdings: StrategyHolding[];
+  recentTrades: StrategyTradeRecord[];
+  latestDraft: StrategyDraft;
+  equityUsd: number;
+  totalPnlPct: number;
+  updatedAt: string;
+  status: "ok" | "stale" | "error";
+}
+
+export interface StrategyCandidatePoolInfo {
+  source: "holdings+scored_pool";
+  holdingsCount: number;
+  scoredPoolCount: number;
+  autoDiscoveryAvailable: false;
+}
+
+export interface GetStrategySnapshotResponse {
+  snapshots: StrategySnapshot[];
+  equityPoints: StrategyEquityPoint[];
+  lastRefreshAt: string | null;
+  refreshStatus: "ok" | "stale" | "never";
+  candidatePool: StrategyCandidatePoolInfo | null;
+}
+
+export interface GetStrategyDraftsResponse {
+  drafts: StrategyDraft[];
+  generatedAt: string | null;
+}

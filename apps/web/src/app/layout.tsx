@@ -23,6 +23,9 @@ export const metadata: Metadata = {
   title: "爱赵赵 | Meme Affinity Lab",
   description:
     "爱赵赵是一个面向 BSC meme 代币的喜爱度实验室，聚合人物评分、特定地址评分、聪明钱热度与技术说明。",
+  icons: {
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💛</text></svg>",
+  },
 };
 
 export default function RootLayout({

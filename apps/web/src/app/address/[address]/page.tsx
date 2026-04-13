@@ -209,36 +209,6 @@ export default async function AddressDetailsPage({ params }: AddressPageProps) {
             ))}
           </div>
 
-          {profile.summary ? (
-            <p className="mx-auto mt-6 max-w-2xl text-center text-sm leading-7 text-[var(--color-ink-soft)]">
-              {profile.summary}
-            </p>
-          ) : null}
-
-          {profile.evidence.length > 0 ? (
-            <div className="mx-auto mt-5 max-w-2xl">
-              <div className="rounded-[20px] border border-white/8 bg-black/15 px-5 py-4">
-                <ul className="space-y-2">
-                  {profile.evidence.slice(0, 4).map((item) => (
-                    <li
-                      key={item}
-                      className="text-xs leading-6 text-[var(--color-ink-soft)]"
-                    >
-                      · {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          ) : null}
-
-          {error ? (
-            <p className="mt-5 text-center text-xs text-amber-100/90">提示：{error}</p>
-          ) : null}
-
-          <p className="mt-8 text-center text-xs text-[var(--color-ink-soft)]">
-            仅供参考，不构成任何交易建议。
-          </p>
         </div>
 
         <style>{`

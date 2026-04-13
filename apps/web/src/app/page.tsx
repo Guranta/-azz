@@ -1,13 +1,12 @@
 import { SponsorSurface } from "@/components/sponsor-surface";
 import { QueryCard } from "@/components/token-search-form";
-import { createMetricsRecorder } from "@/lib/runtime-metrics";
+import { getInitialMetrics } from "@/lib/runtime-metrics";
 
 export const revalidate = 3600;
 
 function getAveMetricsSnapshot() {
   try {
-    const recorder = createMetricsRecorder();
-    return recorder.getMetrics();
+    return getInitialMetrics();
   } catch {
     return null;
   }
