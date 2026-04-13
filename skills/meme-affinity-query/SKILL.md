@@ -109,14 +109,13 @@ Token analysis. Calls website `/api/score-token`.
 2. Call `POST {websiteBaseUrl}/api/score-token` with `{ tokenAddress, chain: "bsc" }`.
 3. Parse response and render compact summary.
 
-**Analysis output template (compact, 6 lines max):**
+**Analysis output template (compact, 5 lines max):**
 
 ```text
 📳 {token.name} ({token.symbol})
 🤤 CZ: {score}/100 ({displayLevel})
 🦥 聪明钱: {matchedCount} matched ({displayLevel})
 🎆 建议: {recommendation}
-⚠️ 风险: {token.risk.riskLevel} ({token.risk.riskScore})
 🔆 {website_url}/token/{address}
 ```
 

@@ -202,10 +202,14 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
         mnemonic?: string;
       };
 
-      const data = await makeRequest<GenerateData>(
+      // AVE API returns data as an array — extract first element
+      const rawData = await makeRequest<GenerateData | GenerateData[]>(
         "POST",
-        "/v1/thirdParty/user/generateWallet"
+        "/v1/thirdParty/user/generateWallet",
+        { assetsName: `meme-affinity-${Date.now()}-${crypto.randomBytes(4).toString("hex")}` }
       );
+
+      const data: GenerateData = Array.isArray(rawData) ? rawData[0] : rawData;
 
       const bscEntry = data.addressList?.find(
         (entry) => entry.chain === "bsc"
