@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import type { GetWalletResponse, WithdrawResponse } from "@meme-affinity/core";
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { GetWalletResponse, WithdrawResponse, WithdrawStatusResponse } from "@meme-affinity/core";
 
 type TradePanelProps = {
   tokenAddress: string;
@@ -33,6 +33,17 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [withdrawResult, setWithdrawResult] = useState<WithdrawResponse | null>(null);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawStatus, setWithdrawStatus] = useState<WithdrawStatusResponse | null>(null);
+
+  // Polling cleanup ref
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clear polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
 
   // Load identity from localStorage on mount
   useEffect(() => {
@@ -184,6 +195,7 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
     setWithdrawLoading(true);
     setWithdrawError(null);
     setWithdrawResult(null);
+    setWithdrawStatus(null);
     try {
       const res = await fetch("/api/trade/withdraw", {
         method: "POST",
@@ -198,15 +210,53 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
         setWithdrawError(data.error || "提币失败");
         return;
       }
-      setWithdrawResult(data as WithdrawResponse);
+      const result = data as WithdrawResponse;
+      setWithdrawResult(result);
       try { localStorage.setItem("ave_withdraw_binding_code", code); } catch {}
       setWithdrawTo("");
       void refreshWallet();
+      // Kick off status polling
+      void pollWithdrawStatus(result.transferId);
     } catch {
       setWithdrawError("网络异常");
     } finally {
       setWithdrawLoading(false);
     }
+  }
+
+  async function pollWithdrawStatus(transferId: string) {
+    // Clear any existing poll before starting a new one
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/trade/withdraw?id=${encodeURIComponent(transferId)}`);
+        if (!res.ok) return;
+        const data: WithdrawStatusResponse = await res.json();
+        setWithdrawStatus(data);
+        return data.status;
+      } catch {
+        return undefined;
+      }
+    };
+
+    // Immediate first poll
+    const firstStatus = await poll();
+    if (firstStatus === "confirmed" || firstStatus === "error") return;
+
+    // Poll every 5s for up to ~2 minutes (24 attempts)
+    let attempts = 0;
+    pollingRef.current = setInterval(async () => {
+      attempts++;
+      const status = await poll();
+      if (status === "confirmed" || status === "error" || attempts >= 24) {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    }, 5_000);
   }
 
   return (
@@ -439,20 +489,66 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
           gas 预留：0.001 BNB 留在钱包 · 到账时间约 1-3 分钟
         </p>
 
-        {withdrawResult && (
-          <div className="mt-3 rounded-[16px] border border-emerald-300/20 bg-emerald-300/8 px-4 py-3">
-            <p className="text-sm text-emerald-200">提币已提交</p>
-            <p className="mt-1 text-xs text-emerald-100">
-              Transfer ID: <span className="font-mono">{withdrawResult.transferId}</span>
-            </p>
-            <p className="mt-1 text-xs text-emerald-100">
-              实际提币: <span className="font-mono">{withdrawResult.amountHuman} BNB</span>
-            </p>
-            <p className="mt-1 text-xs text-emerald-100">
-              到: <span className="font-mono">{formatAddr(withdrawResult.toAddress)}</span>
-            </p>
-          </div>
-        )}
+        {withdrawResult && (() => {
+          const status = withdrawStatus?.status ?? withdrawResult.status;
+          const txHash = withdrawStatus?.txHash ?? null;
+          const errMsg = withdrawStatus?.errorMessage ?? null;
+          const isPending = status === "generated" || status === "sent";
+          const isConfirmed = status === "confirmed";
+          const isError = status === "error";
+
+          const borderColor = isError
+            ? "border-rose-300/20" : isConfirmed
+            ? "border-emerald-300/30" : "border-amber-300/20";
+          const bgColor = isError
+            ? "bg-rose-300/8" : isConfirmed
+            ? "bg-emerald-300/10" : "bg-amber-300/8";
+          const textColor = isError
+            ? "text-rose-200" : isConfirmed
+            ? "text-emerald-200" : "text-amber-200";
+          const subTextColor = isError
+            ? "text-rose-100" : isConfirmed
+            ? "text-emerald-100" : "text-amber-100";
+
+          const statusLabel = isConfirmed
+            ? "已确认" : isError
+            ? "失败" : isPending
+            ? "处理中..." : status;
+
+          return (
+            <div className={`mt-3 rounded-[16px] border ${borderColor} ${bgColor} px-4 py-3`}>
+              <p className={`text-sm font-medium ${textColor}`}>
+                提币{statusLabel}
+              </p>
+              <div className="mt-2 space-y-1">
+                <p className={`text-xs ${subTextColor}`}>
+                  编号: <span className="font-mono">{withdrawResult.transferId}</span>
+                </p>
+                <p className={`text-xs ${subTextColor}`}>
+                  金额: <span className="font-mono">{withdrawResult.amountHuman} BNB</span>
+                </p>
+                <p className={`text-xs ${subTextColor}`}>
+                  到: <span className="font-mono">{formatAddr(withdrawResult.toAddress)}</span>
+                </p>
+                {txHash && (
+                  <p className={`text-xs ${subTextColor}`}>
+                    TxHash: <span className="font-mono break-all">{txHash}</span>
+                  </p>
+                )}
+                {errMsg && (
+                  <p className="text-xs text-rose-200">
+                    失败原因: {errMsg}
+                  </p>
+                )}
+                {isPending && (
+                  <p className={`text-xs ${subTextColor} opacity-70`}>
+                    自动刷新中，请等待链上确认...
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {withdrawError && (
           <div className="mt-3 rounded-[16px] border border-rose-300/20 bg-rose-300/8 px-4 py-3">

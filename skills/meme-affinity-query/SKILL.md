@@ -3,13 +3,14 @@ name: azz
 installUrl: skills/meme-affinity-query
 description: |
   BSC meme 代币分析与交易 Skill。
-  五条指令：分析、绑定、授权、买、卖。
-  网站创建钱包并签发绑定码；Skill 不持有任何密钥。
+  六条指令：分析、绑定、授权、买、卖、提币。
+  网站创建钱包并签发绑定码；提币仅支持 BNB 全提；Skill 不持有任何密钥。
 tags:
   - bsc
   - meme
   - trading
   - openclaw
+  - withdraw
 ---
 
 # 爱赵赵 Skill
@@ -18,7 +19,8 @@ tags:
 
 ## 用途
 
-- 接受 BSC 代币操作（`分析`、`绑定`、`授权`、`买`、`卖`）
+- 接受 BSC 代币操作（`分析`、`绑定`、`授权`、`买`、`卖`、`提币`）
+- `授权` / `买` / `卖` 走会话绑定；`提币` 按当前产品规则要求用户显式提供 `绑定码 + 目标地址`
 - 仅调用网站 API 端点
 - 所有重逻辑留在网站端
 - 交易流程基于绑定码状态驱动，用户无需每次输入 `assetsId`
@@ -35,8 +37,9 @@ tags:
 1. `绑定码`（`bindingCode`）是唯一的外部绑定入口 — Skill 面向流程中不出现 `assetsId`
 2. `分析` 不依赖绑定状态
 3. `授权` / `买` / `卖` 需要绑定状态（`BOUND`）
-4. Skill 仅调用网站 API — 不直接调用 AVE/MiniMax/DeepSeek
-5. Skill 不持有 API 密钥、秘密或凭证
+4. `提币` 固定要求用户提供 `绑定码 + 目标地址`，仅支持 BNB 全提，不支持指定金额
+5. Skill 仅调用网站 API — 不直接调用 AVE/MiniMax/DeepSeek
+6. Skill 不持有 API 密钥、秘密或凭证
 
 ## 支持的指令
 
@@ -45,6 +48,7 @@ tags:
 - `授权 <token>`
 - `买 <token> <amount> <baseToken>`
 - `卖 <token> <amount> <baseToken>`
+- `提币 <绑定码> <目标地址>`
 
 不引入额外的指令族。
 
@@ -69,6 +73,7 @@ tags:
 
 - `UNBOUND -> BOUND`：`绑定 <绑定码>` 成功且返回状态为 `active`
 - `BOUND -> UNBOUND`：绑定被替换/清除，或后续操作验证失败
+- `提币` 不写入会话绑定状态；每次调用都显式传入 `bindingCode`
 
 ## 网站优先的入门流程
 
@@ -77,10 +82,11 @@ tags:
 1. 用户打开网站并点击"创建钱包"。
 2. 网站通过 AVE Bot API 创建平台托管钱包。
 3. 网站返回钱包地址和 `绑定码` 给用户。
-4. 用户在 Skill 中运行 `绑定 <绑定码>` 进入绑定状态。
+4. 用户在 Skill 中运行 `绑定 <绑定码>` 进入绑定状态，或在 `提币 <绑定码> <目标地址>` 中直接使用绑定码。
 
 Skill 端规则：
 - 正常 Skill 流程不会要求用户输入 `assetsId`；外部绑定入口仅保留 `绑定码`（`bindingCode`）。
+- `授权` / `买` / `卖` 使用会话绑定；`提币` 直接使用用户提供的 `bindingCode` 和目标地址。
 - 用户无需提供 API 密钥或秘密。
 
 ## 指令
@@ -328,29 +334,104 @@ spender: {spender}
 
 ---
 
-## 交易状态渲染（`买` / `卖`）
+### `提币 <绑定码> <目标地址>`
 
-将网站订单状态映射到所需的输出标签：
+将平台托管钱包中的全部 BNB 提到外部 BSC 地址。
+
+**参数：**
+- `bindingCode`：用户提供的绑定码
+- `toAddress`：目标 BSC 地址
+
+**固定规则：**
+- 仅支持 BNB
+- 仅支持全提
+- 系统自动预留 `0.001 BNB` 作为 gas
+- Skill 只调用网站 API，不持有密钥
+
+**执行：**
+
+1. 验证 `bindingCode` 非空。
+2. 验证 `toAddress` 为合法 BSC 地址，且不能与当前托管钱包地址相同。
+3. 调用 `POST https://azz.886668.shop/api/trade/withdraw`：
+   ```json
+   {
+     "bindingCode": "...",
+     "toAddress": "0x..."
+   }
+   ```
+4. 将响应中的 `transferId`、`amountHuman`、`toAddress`、`status` 渲染为提币结果。
+5. 如果状态为 `generated` 或 `sent`，可选调用 `GET https://azz.886668.shop/api/trade/withdraw?id={transferId}` 跟踪最新状态，直到 `confirmed` 或 `error`。
+
+**提币处理中输出（`待确认`）：**
+
+```text
+🟡 待确认
+操作: 提币
+编号: {transferId}
+金额: {amountHuman} BNB
+到: {toAddress}
+状态: {generated|sent}
+系统已自动预留 0.001 BNB 作为 gas
+```
+
+**提币成功输出（`成功`）：**
+
+```text
+✅ 成功
+操作: 提币
+编号: {transferId}
+金额: {amountHuman} BNB
+到: {toAddress}
+状态: confirmed
+{txHash if exists}
+```
+
+**提币失败输出（`失败`）：**
+
+```text
+❌ 失败
+操作: 提币
+编号: {transferId if exists}
+到: {toAddress}
+原因: {errorMessage or sanitized API error}
+```
+
+---
+
+## 交易状态渲染（`买` / `卖` / `提币`）
+
+将网站订单 / 提币状态映射到所需的输出标签：
 
 - `generated` -> `待确认`
 - `sent` -> `待确认`
 - `confirmed` -> `成功`
 - `error` -> `失败`
 
-**待处理订单输出（`待确认`）：**
+**待处理输出（`待确认`）：**
 
 ```text
+买/卖：
 🟡 待确认
 操作: {买/卖}
 代币: {tokenAddress}
 订单: {orderId}
 状态: {generated|sent}
 链上确认中，请稍后查询
+
+提币：
+🟡 待确认
+操作: 提币
+编号: {transferId}
+金额: {amountHuman} BNB
+到: {toAddress}
+状态: {generated|sent}
+系统已自动预留 0.001 BNB 作为 gas
 ```
 
-**已确认订单输出（`成功`）：**
+**已确认输出（`成功`）：**
 
 ```text
+买/卖：
 ✅ 成功
 操作: {买/卖}
 代币: {tokenAddress}
@@ -358,15 +439,33 @@ spender: {spender}
 状态: confirmed
 {txHash if exists}
 {inAmount → outAmount if both exist}
+
+提币：
+✅ 成功
+操作: 提币
+编号: {transferId}
+金额: {amountHuman} BNB
+到: {toAddress}
+状态: confirmed
+{txHash if exists}
 ```
 
-**失败订单输出（`失败`）：**
+**失败输出（`失败`）：**
 
 ```text
+买/卖：
 ❌ 失败
 操作: {买/卖}
 代币: {tokenAddress}
 订单: {orderId}
+状态: error
+原因: {errorMessage or sanitized API error}
+
+提币：
+❌ 失败
+操作: 提币
+编号: {transferId if exists}
+到: {toAddress}
 状态: error
 原因: {errorMessage or sanitized API error}
 ```
@@ -389,13 +488,21 @@ spender: {spender}
 
 如果 `卖` 收到 `Token not approved yet (sell requires approve first)`，返回 `失败` 并指示用户先运行 `授权 <token>`。
 
-### 订单处理中（pending order）
+### 提币参数非法（invalid withdraw request）
 
-如果订单状态为 `generated` 或 `sent`，返回 `待确认` 并包含 `orderId`。
+如果 `提币` 缺少 `bindingCode` 或 `toAddress`、目标地址不是合法 BSC 地址、或目标地址与当前托管钱包地址相同，返回 `失败`。
 
-### 订单失败（failed order）
+### 无可提 BNB（no withdrawable BNB）
 
-如果订单状态为 `error`，或 swap/approve API 失败，返回 `失败` 并附带净化后的原因。
+如果 `提币` 收到 `No BNB balance to withdraw` 或 `BNB balance too low to cover gas buffer`，返回 `失败`。
+
+### 处理中（pending order / pending withdraw）
+
+如果订单或提币状态为 `generated` 或 `sent`，返回 `待确认` 并包含 `orderId` 或 `transferId`。
+
+### 失败（failed order / failed withdraw）
+
+如果订单状态为 `error`，或 swap/approve/withdraw API 失败，返回 `失败` 并附带净化后的原因。
 
 ## 路由摘要
 
@@ -406,11 +513,16 @@ skill 输入 -> 解析指令 ->
   如果 授权 -> 要求绑定 -> 授权确认 -> 调用 /api/trade/approve(bindingCode) -> 返回 成功/失败
   如果 买 -> 要求绑定 -> 买入确认(显示数量/滑点) -> 调用 /api/trade/swap(side=buy,bindingCode) -> 返回 待确认/成功/失败
   如果 卖 -> 要求绑定 -> 卖出确认(显示数量/滑点) -> 调用 /api/trade/swap(side=sell,bindingCode) -> 返回 待确认/成功/失败
+  如果 提币 -> 校验 bindingCode + toAddress -> 调用 /api/trade/withdraw -> 返回 待确认/成功/失败
+    如需追踪 -> 调用 /api/trade/withdraw?id={transferId}
 ```
 
 ## 约束
 
 - 仅 BSC
+- 提币仅支持 BNB 全额提到外部 BSC 地址
+- 不支持 USDT 提币
+- 系统自动预留 0.001 BNB 作为 gas
 - 无浏览器钱包集成
 - 无自动交易，无静默交易
 - 无多链

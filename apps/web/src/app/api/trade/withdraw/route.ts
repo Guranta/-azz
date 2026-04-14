@@ -1,11 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { WithdrawRequest, WithdrawResponse } from "@meme-affinity/core";
+import type { WithdrawRequest, WithdrawResponse, WithdrawStatusResponse } from "@meme-affinity/core";
 import { resolveAveBotClient } from "@/lib/resolve-trade-credential";
 import { getBindingByBindingCode } from "@/lib/binding-store";
-import { AveBotConfigError, AveBotApiError } from "@/lib/ave-bot-client";
+import { createAveBotClientFromEnv, AveBotConfigError, AveBotApiError } from "@/lib/ave-bot-client";
 
 const BSC_BNB_ADDRESS = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const GAS_BUFFER_WEI = BigInt("1000000000000000"); // 0.001 BNB
+
+export async function GET(request: NextRequest) {
+  const id = request.nextUrl.searchParams.get("id")?.trim();
+  if (!id) {
+    return NextResponse.json(
+      { error: "id query parameter is required" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const client = createAveBotClientFromEnv();
+    const results = await client.getTransferStatus(id);
+    const entry = results[0];
+
+    if (!entry) {
+      return NextResponse.json(
+        { error: "Transfer not found" },
+        { status: 404 }
+      );
+    }
+
+    const body: WithdrawStatusResponse = {
+      transferId: entry.id,
+      status: entry.status,
+      txHash: entry.txHash,
+      errorMessage: entry.errorMessage,
+    };
+
+    return NextResponse.json(body);
+  } catch (error) {
+    if (error instanceof AveBotConfigError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
+    if (error instanceof AveBotApiError) {
+      return NextResponse.json(
+        { error: error.upstreamMessage || error.message },
+        { status: 502 }
+      );
+    }
+    console.error("[withdraw-status] unexpected error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

@@ -169,7 +169,7 @@ export default async function AddressDetailsPage({ params }: AddressPageProps) {
 
   return (
     <main className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col px-6 py-6 md:px-10 md:py-8">
-      <SiteNav ctaHref="/" ctaLabel="再查一个" showTechLink={false} />
+      <SiteNav showTechLink={false} />
 
       <section className="surface-card-strong poster-enter relative overflow-hidden px-6 py-7 md:px-10 md:py-10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(244,199,106,0.16),transparent_45%),radial-gradient(circle_at_82%_78%,rgba(122,215,255,0.16),transparent_42%)]" />

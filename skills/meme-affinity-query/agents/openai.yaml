@@ -1,4 +1,5 @@
 interface:
   display_name: "爱赵赵"
-  short_description: "BSC meme 代币分析与交易：分析、绑定、授权、买、卖"
-  default_prompt: "使用 $azz 处理 BSC 代币操作。五条指令：(1) 分析 <token> — 调用 POST /api/score-token，返回紧凑的 CZ/聪明钱摘要及链接。无需绑定。(2) 绑定 <绑定码> — 调用 POST /api/trade/bind，在会话中保存绑定码。用户在网站创建钱包后获取绑定码。(3) 授权 <token> — 需要活跃绑定，要求用户确认后调用 POST /api/trade/approve 并传入 bindingCode。(4) 买 <token> <amount> <baseToken> — 需要活跃绑定，要求用户确认数量/滑点后调用 POST /api/trade/swap side=buy 并传入 bindingCode。(5) 卖 <token> <amount> <baseToken> — 与买入相同但 side=sell，代币必须先授权。未经用户回复精确"确认"绝不执行授权/买/卖。所有评分和 AVE 逻辑保留在网站端。仅 BSC。无浏览器钱包。用户无需提供 API 密钥 — 平台管理钱包和密钥。网站地址固定为 https://azz.886668.shop。"
+  short_description: "BSC meme 代币分析与交易：分析、绑定、授权、买、卖、提币"
+  default_prompt: >-
+    使用 $azz 处理 BSC 代币操作。六条指令：(1) 分析 <token> — 调用 POST /api/score-token，返回紧凑的 CZ/聪明钱摘要及链接，无需绑定。(2) 绑定 <绑定码> — 调用 POST /api/trade/bind，在会话中保存绑定码；用户在网站创建钱包后获取绑定码。(3) 授权 <token> — 需要活跃绑定，要求用户确认后调用 POST /api/trade/approve 并传入 bindingCode。(4) 买 <token> <amount> <baseToken> — 需要活跃绑定，要求用户确认数量/滑点后调用 POST /api/trade/swap，side=buy，并传入 bindingCode。(5) 卖 <token> <amount> <baseToken> — 与买入相同但 side=sell，代币必须先授权。(6) 提币 <绑定码> <目标地址> — 按当前产品规则调用 POST /api/trade/withdraw，仅支持 BNB 全提到外部 BSC 地址，系统自动预留 0.001 BNB 作为 gas；如需跟踪状态，可调用 GET /api/trade/withdraw?id=...。未经用户回复精确“确认”绝不执行授权/买/卖。提币只使用用户提供的绑定码和目标地址，不持有密钥。所有评分和 AVE 逻辑保留在网站端。仅 BSC。无浏览器钱包。用户无需提供 API 密钥。网站地址固定为 https://azz.886668.shop，安装标识保持 azz。

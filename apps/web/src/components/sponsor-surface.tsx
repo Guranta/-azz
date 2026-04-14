@@ -18,14 +18,36 @@ const SPONSORS = [
   },
 ] as const;
 
-const AVE_BASELINE_OFFSET = 12_000;
-
 type SponsorSurfaceProps = {
   aveTotalCount: number;
+  aveLastUpdated?: string | null;
 };
 
-export function SponsorSurface({ aveTotalCount }: SponsorSurfaceProps) {
-  const aveDisplayCount = Math.max(0, aveTotalCount + AVE_BASELINE_OFFSET);
+function formatAveLastUpdated(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Shanghai",
+  }).format(date);
+}
+
+export function SponsorSurface({
+  aveTotalCount,
+  aveLastUpdated,
+}: SponsorSurfaceProps) {
+  const lastUpdatedLabel = formatAveLastUpdated(aveLastUpdated);
 
   return (
     <footer className="mt-10 flex flex-col items-center gap-3 pb-2 md:mt-14">
@@ -52,9 +74,18 @@ export function SponsorSurface({ aveTotalCount }: SponsorSurfaceProps) {
         {"AVE API \u7d2f\u8ba1\u8c03\u7528\u6b21\u6570"}
         {" "}
         <span className="font-semibold text-[var(--color-ink-soft)]">
-          {aveDisplayCount.toLocaleString("zh-CN")}
+          {Math.max(0, aveTotalCount).toLocaleString("zh-CN")}
         </span>
       </p>
+
+      {lastUpdatedLabel ? (
+        <p className="text-[0.63rem] tracking-[0.05em] text-[var(--color-muted)]">
+          {"\u5237\u65b0\u9875\u9762\u53ef\u89c1\u6700\u65b0\u7d2f\u8ba1 \u00b7 \u6700\u8fd1\u5199\u5165 "}
+          <span className="font-medium text-[var(--color-ink-soft)]">
+            {lastUpdatedLabel}
+          </span>
+        </p>
+      ) : null}
     </footer>
   );
 }

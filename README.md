@@ -12,13 +12,13 @@ path: skills/meme-affinity-query
 skill: azz
 ```
 
-可用指令：`分析` · `绑定` · `授权` · `买` · `卖`
+可用指令：`分析` · `绑定` · `授权` · `买` · `卖` · `提币`
 
 ---
 
 BSC meme 代币喜爱度分析与交易平台：
-- 公开网站：代币评分、地址画像、创建托管钱包、获取绑定码、充值
-- OpenClaw Skill：绑定后执行交易（`授权`、`买`、`卖`）
+- 公开网站：代币评分、地址画像、创建托管钱包、获取绑定码、充值、BNB 全额提币
+- OpenClaw Skill：分析、绑定、授权、买、卖、提币
 - 平台托管钱包，通过绑定码管理
 
 ## 工作区结构
@@ -38,7 +38,7 @@ docs              项目文档
 3. 网站返回钱包地址和绑定码
 4. 用户向钱包地址存入 BNB 或 USDT
 5. 在 OpenClaw 中发送 `绑定 <绑定码>` 绑定 Skill 会话
-6. Skill 绑定后可执行 `授权`、`买`、`卖` 操作
+6. Skill 绑定后可执行 `授权`、`买`、`卖` 操作；也可使用 `提币 <绑定码> <目标地址>` 发起 BNB 全额提币（系统自动预留 gas）
 
 用户无需提供 API 密钥。平台管理所有 AVE Bot 凭证。
 
@@ -216,5 +216,7 @@ GET  /api/trade/wallet?bindingCode=...    # 钱包信息 + 余额
 POST /api/trade/bind                      # 通过绑定码绑定
 POST /api/trade/approve                   # 授权代币卖出
 POST /api/trade/swap                      # 买入或卖出
+POST /api/trade/withdraw                  # BNB 全额提币
+GET  /api/trade/withdraw?id=...           # 提币状态
 GET  /api/trade/orders?ids=...            # 订单状态
 ```

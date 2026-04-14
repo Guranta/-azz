@@ -400,3 +400,10 @@ export interface WithdrawResponse {
 }
 
 export type WithdrawStatus = "generated" | "sent" | "confirmed" | "error";
+
+export interface WithdrawStatusResponse {
+  transferId: string;
+  status: WithdrawStatus;
+  txHash: string | null;
+  errorMessage: string | null;
+}

@@ -11,7 +11,11 @@ function resolveWebRoot(): string {
 
 const WEB_ROOT = resolveWebRoot();
 
-export interface AveMetrics {
+// Historical AVE calls that happened before the runtime file counter was added.
+// With the current runtime file total (1,594), this makes the public total 57,285.
+const AVE_HISTORICAL_TOTAL_COUNT = 55_691;
+
+interface StoredAveMetrics {
   tokenDetailCount: number;
   riskCount: number;
   top100Count: number;
@@ -21,11 +25,12 @@ export interface AveMetrics {
   lastUpdated: string;
 }
 
-const METRICS_FILE = path.join(
-  WEB_ROOT,
-  ".runtime",
-  "ave-metrics.json"
-);
+export interface AveMetrics extends StoredAveMetrics {
+  runtimeTotalCount: number;
+  historicalTotalCount: number;
+}
+
+const METRICS_FILE = path.join(WEB_ROOT, ".runtime", "ave-metrics.json");
 
 const METRICS_SNAPSHOT_FILE = path.join(
   WEB_ROOT,
@@ -42,8 +47,6 @@ type MetricsKey =
   | "addressTxCount"
   | "smartWalletListCount";
 
-let writeChain: Promise<void> = Promise.resolve();
-
 function ensureDir(filePath: string): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
@@ -51,19 +54,9 @@ function ensureDir(filePath: string): void {
   }
 }
 
-function readMetricsFromFile(): AveMetrics | null {
-  try {
-    if (!fs.existsSync(METRICS_FILE)) {
-      return null;
-    }
-    const raw = fs.readFileSync(METRICS_FILE, "utf-8");
-    return JSON.parse(raw) as AveMetrics;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeMetrics(input: Partial<AveMetrics> | null): AveMetrics {
+function normalizeStoredMetrics(
+  input: Partial<StoredAveMetrics> | null
+): StoredAveMetrics {
   return {
     tokenDetailCount: Math.max(0, Number(input?.tokenDetailCount ?? 0) || 0),
     riskCount: Math.max(0, Number(input?.riskCount ?? 0) || 0),
@@ -78,6 +71,90 @@ function normalizeMetrics(input: Partial<AveMetrics> | null): AveMetrics {
   };
 }
 
+function toPublicMetrics(stored: StoredAveMetrics): AveMetrics {
+  const runtimeTotalCount = stored.totalCount;
+
+  return {
+    ...stored,
+    runtimeTotalCount,
+    historicalTotalCount: AVE_HISTORICAL_TOTAL_COUNT,
+    totalCount: runtimeTotalCount + AVE_HISTORICAL_TOTAL_COUNT,
+  };
+}
+
+function normalizePublicMetrics(input: Partial<AveMetrics> | null): AveMetrics {
+  const runtimeTotalCountValue = input?.runtimeTotalCount;
+  const historicalTotalCountValue = input?.historicalTotalCount;
+  const hasRuntimeTotalCount =
+    typeof runtimeTotalCountValue === "number" &&
+    Number.isFinite(runtimeTotalCountValue);
+  const hasHistoricalTotalCount =
+    typeof historicalTotalCountValue === "number" &&
+    Number.isFinite(historicalTotalCountValue);
+
+  const runtimeTotalCount = hasRuntimeTotalCount
+    ? Math.max(0, runtimeTotalCountValue)
+    : Math.max(0, Number(input?.totalCount ?? 0) || 0);
+  const historicalTotalCount = hasHistoricalTotalCount
+    ? Math.max(0, historicalTotalCountValue)
+    : AVE_HISTORICAL_TOTAL_COUNT;
+
+  return {
+    tokenDetailCount: Math.max(0, Number(input?.tokenDetailCount ?? 0) || 0),
+    riskCount: Math.max(0, Number(input?.riskCount ?? 0) || 0),
+    top100Count: Math.max(0, Number(input?.top100Count ?? 0) || 0),
+    addressTxCount: Math.max(0, Number(input?.addressTxCount ?? 0) || 0),
+    smartWalletListCount: Math.max(0, Number(input?.smartWalletListCount ?? 0) || 0),
+    runtimeTotalCount,
+    historicalTotalCount,
+    totalCount: runtimeTotalCount + historicalTotalCount,
+    lastUpdated:
+      typeof input?.lastUpdated === "string" && input.lastUpdated
+        ? input.lastUpdated
+        : new Date().toISOString(),
+  };
+}
+
+function readStoredMetricsFromFile(): StoredAveMetrics | null {
+  try {
+    if (!fs.existsSync(METRICS_FILE)) {
+      return null;
+    }
+    const raw = fs.readFileSync(METRICS_FILE, "utf-8");
+    return normalizeStoredMetrics(JSON.parse(raw) as Partial<StoredAveMetrics>);
+  } catch {
+    return null;
+  }
+}
+
+function readSnapshotFromFile(): AveMetrics | null {
+  try {
+    if (!fs.existsSync(METRICS_SNAPSHOT_FILE)) {
+      return null;
+    }
+
+    const raw = fs.readFileSync(METRICS_SNAPSHOT_FILE, "utf-8");
+    const parsed = JSON.parse(raw) as Partial<AveMetrics>;
+
+    if (typeof parsed.runtimeTotalCount !== "number") {
+      return null;
+    }
+
+    return normalizePublicMetrics(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredMetricsToFile(metrics: StoredAveMetrics): void {
+  try {
+    ensureDir(METRICS_FILE);
+    fs.writeFileSync(METRICS_FILE, JSON.stringify(metrics, null, 2), "utf-8");
+  } catch {
+    // Silently fail - metrics should not crash the app.
+  }
+}
+
 function writeMetricsSnapshotToFile(metrics: AveMetrics): void {
   try {
     ensureDir(METRICS_SNAPSHOT_FILE);
@@ -87,44 +164,32 @@ function writeMetricsSnapshotToFile(metrics: AveMetrics): void {
       "utf-8"
     );
   } catch {
-    // Silently fail
+    // Silently fail - snapshotting should not crash the app.
   }
 }
 
-function runSerialized<T>(operation: () => T | Promise<T>): Promise<T> {
-  const next = writeChain.then(operation, operation);
-  writeChain = next.then(
-    () => undefined,
-    () => undefined
-  );
-  return next;
+function getStoredMetrics(): StoredAveMetrics {
+  return normalizeStoredMetrics(readStoredMetricsFromFile());
+}
+
+function getPublicMetrics(): AveMetrics {
+  return toPublicMetrics(getStoredMetrics());
 }
 
 function incrementMetrics(metricKey: MetricsKey): void {
-  void runSerialized(() => {
-    const current = normalizeMetrics(readMetricsFromFile());
-    current[metricKey] += 1;
-    current.totalCount += 1;
-    current.lastUpdated = new Date().toISOString();
-    writeMetricsToFile(current);
-  });
+  const current = getStoredMetrics();
+  current[metricKey] += 1;
+  current.totalCount += 1;
+  current.lastUpdated = new Date().toISOString();
+  writeStoredMetricsToFile(current);
 }
 
-function writeMetricsToFile(metrics: AveMetrics): void {
-  try {
-    ensureDir(METRICS_FILE);
-    fs.writeFileSync(METRICS_FILE, JSON.stringify(metrics, null, 2), "utf-8");
-  } catch {
-    // Silently fail - metrics should not crash the app
-  }
+export function getAveMetrics(): AveMetrics {
+  return getPublicMetrics();
 }
 
 export function getInitialMetrics(): AveMetrics {
-  const persisted = readMetricsFromFile();
-  if (persisted) {
-    return normalizeMetrics(persisted);
-  }
-  return normalizeMetrics(null);
+  return getPublicMetrics();
 }
 
 export function createMetricsRecorder() {
@@ -145,26 +210,27 @@ export function createMetricsRecorder() {
       incrementMetrics("smartWalletListCount");
     },
     getMetrics(): AveMetrics {
-      return normalizeMetrics(readMetricsFromFile());
+      return getPublicMetrics();
     },
     getSnapshot(): AveMetrics {
-      try {
-        if (!fs.existsSync(METRICS_SNAPSHOT_FILE)) {
-          return this.refreshSnapshot();
-        }
-        const raw = fs.readFileSync(METRICS_SNAPSHOT_FILE, "utf-8");
-        const snapshot = normalizeMetrics(JSON.parse(raw) as Partial<AveMetrics>);
-        const snapshotTime = new Date(snapshot.lastUpdated).getTime();
-        if (Date.now() - snapshotTime > METRICS_SNAPSHOT_TTL_MS) {
-          return this.refreshSnapshot();
-        }
-        return snapshot;
-      } catch {
+      const snapshot = readSnapshotFromFile();
+      if (!snapshot) {
         return this.refreshSnapshot();
       }
+
+      const snapshotTime = new Date(snapshot.lastUpdated).getTime();
+      if (!Number.isFinite(snapshotTime)) {
+        return this.refreshSnapshot();
+      }
+
+      if (Date.now() - snapshotTime > METRICS_SNAPSHOT_TTL_MS) {
+        return this.refreshSnapshot();
+      }
+
+      return snapshot;
     },
     refreshSnapshot(): AveMetrics {
-      const snapshot = normalizeMetrics(readMetricsFromFile());
+      const snapshot = getPublicMetrics();
       writeMetricsSnapshotToFile(snapshot);
       return snapshot;
     },

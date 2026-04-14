@@ -1,19 +1,23 @@
 import { SponsorSurface } from "@/components/sponsor-surface";
 import { QueryCard } from "@/components/token-search-form";
-import { getInitialMetrics } from "@/lib/runtime-metrics";
+import { getAveMetrics } from "@/lib/runtime-metrics";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+
+export const revalidate = 0;
 
 function getAveMetricsSnapshot() {
   try {
-    return getInitialMetrics();
+    return getAveMetrics();
   } catch {
     return null;
   }
 }
 
 export default function Home() {
-  const aveTotalCount = getAveMetricsSnapshot()?.totalCount ?? 0;
+  const aveMetrics = getAveMetricsSnapshot();
+  const aveTotalCount = aveMetrics?.totalCount ?? 0;
+  const aveLastUpdated = aveMetrics?.lastUpdated ?? null;
 
   return (
     <main className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-8 md:px-10 md:py-12">
@@ -41,7 +45,10 @@ export default function Home() {
       </div>
 
       {/* Sponsor chips — visually recessed */}
-      <SponsorSurface aveTotalCount={aveTotalCount} />
+      <SponsorSurface
+        aveTotalCount={aveTotalCount}
+        aveLastUpdated={aveLastUpdated}
+      />
     </main>
   );
 }
