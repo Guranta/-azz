@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 type SiteNavProps = {
@@ -24,9 +26,11 @@ export function SiteNav({
   current,
   ctaHref,
   ctaLabel,
-  showTechLink = true,
+  showTechLink: _showTechLink = false,
   showAzzLink = true,
 }: SiteNavProps) {
+  void _showTechLink;
+
   return (
     <header className="mb-8 flex flex-col gap-5 rounded-[28px] border border-white/10 bg-[rgba(7,14,25,0.72)] px-5 py-4 backdrop-blur md:flex-row md:items-center md:justify-between md:px-6">
       <div className="flex items-center gap-3">
@@ -56,14 +60,6 @@ export function SiteNav({
             className={`rounded-full px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 ${azzClass(current === "azz")}`}
           >
             azz
-          </Link>
-        ) : null}
-        {showTechLink ? (
-          <Link
-            href="/tech"
-            className={`rounded-full border px-4 py-2 text-sm transition ${navClass(current === "tech")}`}
-          >
-            技术说明
           </Link>
         ) : null}
         {ctaHref && ctaLabel ? (
