@@ -114,6 +114,43 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return parsed.data;
 }
 
+// ---------- BSC RPC BNB balance fallback ----------
+
+async function queryBnbBalanceRpc(rpcUrl: string, address: string): Promise<string | null> {
+  if (!rpcUrl) return null;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8_000);
+    const response = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "eth_getBalance",
+        params: [address, "latest"],
+        id: 1,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    if (data?.result && typeof data.result === "string") {
+      // eth_getBalance returns hex wei, e.g. "0x1bc16d674ec80000"
+      return BigInt(data.result).toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function formatBnbHuman(wei: bigint): string {
+  const whole = wei / BigInt(10 ** 18);
+  const frac = wei % BigInt(10 ** 18);
+  const fracStr = frac.toString().padStart(18, "0").slice(0, 6).replace(/0+$/, "");
+  return fracStr.length > 0 ? `${whole}.${fracStr}` : whole.toString();
+}
+
 // ---------- Client ----------
 
 export interface AveBotClientOptions {
@@ -121,6 +158,7 @@ export interface AveBotClientOptions {
   apiSecret: string;
   baseUrl?: string;
   timeoutMs?: number;
+  bscRpcUrl?: string;
 }
 
 export interface AveBotClient {
@@ -164,6 +202,7 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
     options.timeoutMs && options.timeoutMs > 0
       ? options.timeoutMs
       : DEFAULT_TIMEOUT_MS;
+  const bscRpcUrl = options.bscRpcUrl?.trim() || "";
 
   async function makeRequest<T>(
     method: "GET" | "POST",
@@ -275,10 +314,12 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
         });
       }
 
-      // 2. Balance lookup (best-effort)
+      // 2. Balance lookup — AVE first, BSC RPC fallback
       let balances: TradeTokenBalance[] = [];
-      let balanceState: "empty" | "funded" = "empty";
+      let balanceState: "empty" | "funded" | "unknown" = "unknown";
+      let balanceSource: "ave" | "rpc" | "unknown" = "unknown";
 
+      let aveBalanceFailed = false;
       try {
         type AssetBalance = {
           tokenAddress?: string;
@@ -316,14 +357,34 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
             (b) => BigInt(b.rawBalance) > BigInt(0)
           );
           balanceState = hasFunds ? "funded" : "empty";
+          balanceSource = "ave";
         }
       } catch (error) {
-        // Balance fetch failure degrades gracefully
+        aveBalanceFailed = true;
         console.warn(
           `[AVE Bot] Balance lookup failed for ${assetsId}: ${error instanceof Error ? error.message : "unknown"}`
         );
-        balanceState = "empty";
-        balances = [];
+      }
+
+      // Fallback: BSC RPC native BNB balance when AVE fails
+      if (aveBalanceFailed) {
+        const rpcResult = await queryBnbBalanceRpc(bscRpcUrl, bscEntry.address);
+        if (rpcResult !== null) {
+          const raw = rpcResult;
+          const human = raw === "0"
+            ? "0"
+            : formatBnbHuman(BigInt(raw));
+          balances = [{
+            tokenAddress: BSC_BNB_ADDRESS,
+            symbol: "BNB",
+            decimals: 18,
+            rawBalance: raw,
+            humanBalance: human,
+          }];
+          balanceState = BigInt(raw) > BigInt(0) ? "funded" : "empty";
+          balanceSource = "rpc";
+        }
+        // else: no RPC URL or RPC failed → stays "unknown"
       }
 
       return {
@@ -333,6 +394,7 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
         status: (bscEntry.status as "enabled" | "disabled") || "enabled",
         type: (bscEntry.type as "self" | "delegate") || "delegate",
         balanceState,
+        balanceSource,
         balances,
       };
     },
@@ -545,5 +607,6 @@ export function createAveBotClientFromEnv(
     apiKey,
     apiSecret,
     baseUrl: env.AVE_BOT_BASE_URL?.trim(),
+    bscRpcUrl: env.BSC_RPC_URL?.trim(),
   });
 }

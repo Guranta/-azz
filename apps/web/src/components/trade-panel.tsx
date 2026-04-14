@@ -9,7 +9,7 @@ type TradePanelProps = {
   tokenSymbol?: string;
 };
 
-type OnboardingState = "no_wallet" | "wallet_empty" | "wallet_funded";
+type OnboardingState = "no_wallet" | "wallet_empty" | "wallet_funded" | "wallet_unknown";
 
 function formatAddr(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -107,7 +107,11 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       }
       const data: GetWalletResponse = await res.json();
       setWallet(data);
-      setOnboarding(data.balanceState === "funded" ? "wallet_funded" : "wallet_empty");
+      setOnboarding(
+        data.balanceState === "funded" ? "wallet_funded"
+        : data.balanceState === "unknown" ? "wallet_unknown"
+        : "wallet_empty"
+      );
       if (data.assetsId && data.assetsId !== assetsId) {
         persistIdentity({ assetsId: data.assetsId });
       }
@@ -255,6 +259,41 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
               className="mt-4 rounded-full bg-[linear-gradient(135deg,#f4c76a_0%,#ff9b62_100%)] px-5 py-3 text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_18px_40px_rgba(244,199,106,0.24)] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               创建钱包
+            </button>
+          </div>
+        )}
+
+        {onboarding === "wallet_unknown" && wallet && (
+          <div className="mt-4">
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-sm text-[var(--color-ink)]">{wallet.walletAddress}</span>
+            </div>
+
+            {wallet.balances.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {wallet.balances.map((b) => (
+                  <span
+                    key={b.tokenAddress}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-mono text-[var(--color-ink)]"
+                  >
+                    {b.humanBalance} {b.symbol}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-3 rounded-[18px] border border-amber-300/20 bg-amber-300/8 px-4 py-3">
+              <p className="text-sm text-amber-50">余额暂时无法确认</p>
+              <p className="mt-1 text-xs text-amber-50/70">
+                余额查询服务异常，请稍后点击刷新重试。
+              </p>
+            </div>
+
+            <button
+              onClick={() => void refreshWallet()}
+              className="mt-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-[var(--color-ink)] transition hover:border-white/18 hover:bg-white/10"
+            >
+              刷新余额
             </button>
           </div>
         )}

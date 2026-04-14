@@ -226,7 +226,8 @@ export interface GetWalletResponse {
   chain: "bsc";
   status: "enabled" | "disabled";
   type: "self" | "delegate";
-  balanceState: "empty" | "funded";
+  balanceState: "empty" | "funded" | "unknown";
+  balanceSource?: "ave" | "rpc" | "unknown";
   balances: TradeTokenBalance[];
 }
 
