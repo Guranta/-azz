@@ -6,6 +6,8 @@ import type {
   ApproveResponse,
   SwapResponse,
   OrderStatus,
+  WithdrawResponse,
+  WithdrawStatus,
 } from "@meme-affinity/core";
 
 const DEFAULT_BOT_BASE_URL = "https://bot-api.ave.ai";
@@ -134,6 +136,15 @@ export interface AveBotClient {
     slippageBps: number;
   }): Promise<SwapResponse>;
   getSwapOrders(ids: string): Promise<OrderStatus[]>;
+  transfer(params: {
+    assetsId: string;
+    fromAddress: string;
+    toAddress: string;
+    tokenAddress: string;
+    amount: string;
+    extraGas?: string;
+  }): Promise<WithdrawResponse>;
+  getTransferStatus(ids: string): Promise<Array<{ id: string; status: WithdrawStatus; txHash: string | null; errorMessage: string | null }>>;
 }
 
 export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
@@ -443,6 +454,76 @@ export function createAveBotClient(options: AveBotClientOptions): AveBotClient {
         inAmount: order.inAmount || null,
         outAmount: order.outAmount || null,
         errorMessage: order.errorMsg || null,
+      }));
+    },
+
+    async transfer(params: {
+      assetsId: string;
+      fromAddress: string;
+      toAddress: string;
+      tokenAddress: string;
+      amount: string;
+      extraGas?: string;
+    }): Promise<WithdrawResponse> {
+      type TransferData = Array<{ id: string }>;
+
+      const data = await makeRequest<TransferData>(
+        "POST",
+        "/v1/thirdParty/tx/transfer",
+        {
+          chain: "bsc",
+          assetsId: params.assetsId,
+          fromAddress: params.fromAddress,
+          toAddress: params.toAddress,
+          tokenAddress: params.tokenAddress,
+          amount: params.amount,
+          extraGas: params.extraGas ?? "0",
+        }
+      );
+
+      const entry = Array.isArray(data) ? data[0] : data;
+
+      return {
+        transferId: entry.id,
+        fromAddress: params.fromAddress,
+        toAddress: params.toAddress,
+        amountWei: params.amount,
+        amountHuman: "",
+        gasBufferWei: params.extraGas ?? "0",
+        status: "generated",
+        createdAt: new Date().toISOString(),
+      };
+    },
+
+    async getTransferStatus(ids: string): Promise<Array<{
+      id: string;
+      status: WithdrawStatus;
+      txHash: string | null;
+      errorMessage: string | null;
+    }>> {
+      type TransferStatusData = Array<{
+        id?: string;
+        status?: string;
+        txHash?: string;
+        errorMessage?: string;
+      }>;
+
+      const data = await makeRequest<TransferStatusData>(
+        "GET",
+        `/v1/thirdParty/tx/getTransfer?chain=bsc&ids=${encodeURIComponent(ids)}`
+      );
+
+      if (!Array.isArray(data)) return [];
+
+      return data.map((item) => ({
+        id: item.id || "",
+        status: (["generated", "sent", "confirmed", "error"].includes(
+          item.status || ""
+        )
+          ? item.status
+          : "error") as WithdrawStatus,
+        txHash: item.txHash || null,
+        errorMessage: item.errorMessage || null,
       }));
     },
   };

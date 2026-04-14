@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { GetWalletResponse } from "@meme-affinity/core";
+import type { GetWalletResponse, WithdrawResponse } from "@meme-affinity/core";
 
 type TradePanelProps = {
   tokenAddress: string;
@@ -27,6 +27,13 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [installCopyState, setInstallCopyState] = useState<"idle" | "copied" | "failed">("idle");
 
+  // Withdraw state
+  const [withdrawBinding, setWithdrawBinding] = useState("");
+  const [withdrawTo, setWithdrawTo] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawResult, setWithdrawResult] = useState<WithdrawResponse | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+
   // Load identity from localStorage on mount
   useEffect(() => {
     try {
@@ -37,6 +44,13 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
       const storedBindingCode = localStorage.getItem("ave_binding_code");
       if (storedBindingCode) {
         setBindingCode(storedBindingCode);
+      }
+      // Withdraw binding: prefer last-used withdraw binding, else page binding
+      const storedWithdrawBinding = localStorage.getItem("ave_withdraw_binding_code");
+      if (storedWithdrawBinding) {
+        setWithdrawBinding(storedWithdrawBinding);
+      } else if (storedBindingCode) {
+        setWithdrawBinding(storedBindingCode);
       }
     } catch {
       // localStorage unavailable
@@ -155,6 +169,42 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
 
   const displayToken = tokenSymbol || tokenName || formatAddr(tokenAddress);
 
+  const bnbBalance = wallet?.balances.find(
+    (b) => b.tokenAddress === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  );
+
+  async function handleWithdraw() {
+    const code = withdrawBinding.trim();
+    const to = withdrawTo.trim();
+    if (!code || !to) return;
+    setWithdrawLoading(true);
+    setWithdrawError(null);
+    setWithdrawResult(null);
+    try {
+      const res = await fetch("/api/trade/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bindingCode: code,
+          toAddress: to,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setWithdrawError(data.error || "提币失败");
+        return;
+      }
+      setWithdrawResult(data as WithdrawResponse);
+      try { localStorage.setItem("ave_withdraw_binding_code", code); } catch {}
+      setWithdrawTo("");
+      void refreshWallet();
+    } catch {
+      setWithdrawError("网络异常");
+    } finally {
+      setWithdrawLoading(false);
+    }
+  }
+
   return (
     <div className="surface-card px-6 py-7 md:px-7">
       <p className="section-kicker">交易面板</p>
@@ -234,10 +284,10 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
             )}
 
             <div className="mt-3 rounded-[18px] border border-amber-300/20 bg-amber-300/8 px-4 py-3">
-              <p className="text-sm text-amber-50">请向这个地址转入 BNB 或 USDT（BSC）</p>
+              <p className="text-sm text-amber-50">请向这个地址转入 BNB（BSC 网络）</p>
               <p className="mt-2 break-all font-mono text-xs text-amber-100">{wallet.walletAddress}</p>
               <p className="mt-2 text-xs text-amber-50/70">
-                到账后点击刷新余额即可继续。建议最少转入 0.1 BNB 或等值 USDT。
+                到账后点击刷新余额即可继续。建议最少转入 0.1 BNB。
               </p>
             </div>
             <button
@@ -296,6 +346,79 @@ export function TradePanel({ tokenAddress, tokenName, tokenSymbol }: TradePanelP
 
         {loading && !wallet && onboarding === "no_wallet" && (
           <p className="mt-4 text-sm text-[var(--color-muted)]">正在创建钱包...</p>
+        )}
+      </div>
+
+      {/* Withdrawal Card */}
+      <div className="mt-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
+        <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted)]">
+          提币
+        </p>
+        <p className="mt-3 text-sm text-[var(--color-ink-soft)]">
+          BNB 全额提币到你的外部钱包。输入绑定码和目标地址即可提币，系统自动预留 0.001 BNB 作为 gas。
+        </p>
+
+        {bnbBalance && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs font-mono text-emerald-200">
+              {bnbBalance.humanBalance} BNB（当前钱包）
+            </span>
+          </div>
+        )}
+
+        <div className="mt-3">
+          <label className="text-xs text-[var(--color-muted)]">绑定码</label>
+          <input
+            type="text"
+            value={withdrawBinding}
+            onChange={(e) => setWithdrawBinding(e.target.value)}
+            placeholder="粘贴绑定码"
+            className="mt-1 w-full rounded-[14px] border border-white/10 bg-black/30 px-4 py-2.5 font-mono text-sm text-[var(--color-ink)] placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)]/40 focus:outline-none"
+          />
+        </div>
+
+        <div className="mt-3">
+          <label className="text-xs text-[var(--color-muted)]">目标地址（BSC）</label>
+          <input
+            type="text"
+            value={withdrawTo}
+            onChange={(e) => setWithdrawTo(e.target.value)}
+            placeholder="0x..."
+            className="mt-1 w-full rounded-[14px] border border-white/10 bg-black/30 px-4 py-2.5 font-mono text-sm text-[var(--color-ink)] placeholder:text-[var(--color-muted)] focus:border-[var(--color-accent)]/40 focus:outline-none"
+          />
+        </div>
+
+        <button
+          onClick={() => void handleWithdraw()}
+          disabled={withdrawLoading || !withdrawBinding.trim() || !withdrawTo.trim()}
+          className="mt-3 rounded-full bg-[linear-gradient(135deg,#f4c76a_0%,#ff9b62_100%)] px-5 py-3 text-sm font-semibold text-[var(--color-accent-ink)] shadow-[0_18px_40px_rgba(244,199,106,0.24)] transition hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {withdrawLoading ? "提币中..." : "提币全部 BNB"}
+        </button>
+
+        <p className="mt-2 text-xs text-[var(--color-ink-soft)]">
+          gas 预留：0.001 BNB 留在钱包 · 到账时间约 1-3 分钟
+        </p>
+
+        {withdrawResult && (
+          <div className="mt-3 rounded-[16px] border border-emerald-300/20 bg-emerald-300/8 px-4 py-3">
+            <p className="text-sm text-emerald-200">提币已提交</p>
+            <p className="mt-1 text-xs text-emerald-100">
+              Transfer ID: <span className="font-mono">{withdrawResult.transferId}</span>
+            </p>
+            <p className="mt-1 text-xs text-emerald-100">
+              实际提币: <span className="font-mono">{withdrawResult.amountHuman} BNB</span>
+            </p>
+            <p className="mt-1 text-xs text-emerald-100">
+              到: <span className="font-mono">{formatAddr(withdrawResult.toAddress)}</span>
+            </p>
+          </div>
+        )}
+
+        {withdrawError && (
+          <div className="mt-3 rounded-[16px] border border-rose-300/20 bg-rose-300/8 px-4 py-3">
+            <p className="text-sm text-rose-200">{withdrawError}</p>
+          </div>
         )}
       </div>
 

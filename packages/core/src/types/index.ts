@@ -377,3 +377,25 @@ export interface GetStrategyDraftsResponse {
   drafts: StrategyDraft[];
   generatedAt: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Withdrawal (V6 — BNB full withdrawal from platform-managed wallets)
+// ---------------------------------------------------------------------------
+
+export interface WithdrawRequest {
+  bindingCode: string;
+  toAddress: string;
+}
+
+export interface WithdrawResponse {
+  transferId: string;
+  fromAddress: string;
+  toAddress: string;
+  amountWei: string;
+  amountHuman: string;
+  gasBufferWei: string;
+  status: string;
+  createdAt: string;
+}
+
+export type WithdrawStatus = "generated" | "sent" | "confirmed" | "error";
